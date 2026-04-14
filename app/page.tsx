@@ -1,20 +1,52 @@
 "use client";
 
-import React, { useState } from 'react';
-import Link from 'next/link'; // 페이지 이동을 위해 Link 임포트
+import React, { useState, useRef } from 'react';
+import Link from 'next/link';
 import { Activity, Heart, Droplets, Utensils, Send } from 'lucide-react';
 import Header from './components/Header';
+import ReactMarkdown from 'react-markdown';
+
+const initialMessages = [
+  { role: 'ai', content: '안녕하세요! 저는 VitalSense AI 건강 분석기입니다. 건강에 관한 무엇이든 물어보세요. 혈당, 혈압, 식단, 운동 등 다양한 건강 정보를 알려드릴 수 있습니다.' }
+];
 
 export default function HealthDashboard() {
-  const [messages, setMessages] = useState([
-    { role: 'ai', content: '안녕하세요! 오늘의 혈당 수치가 평소보다 조금 높네요. 어제 저녁 식단에 탄수화물이 많았나요?' }
-  ]);
+  const [messages, setMessages] = useState(initialMessages);
   const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const handleSendMessage = () => {
-    if (!input.trim()) return;
-    setMessages([...messages, { role: 'user', content: input }]);
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const handleSendMessage = async () => {
+    if (!input.trim() || loading) return;
+    
+    const userMessage = input.trim();
     setInput('');
+    
+    const newMessages = [...messages, { role: 'user', content: userMessage }];
+    setMessages(newMessages);
+    setLoading(true);
+    scrollToBottom();
+
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: newMessages }),
+      });
+      
+      const data = await response.json();
+      setMessages([...newMessages, { role: 'ai', content: data.content }]);
+    } catch (error) {
+      console.error('Chat error:', error);
+      setMessages([...newMessages, { role: 'ai', content: '죄송합니다. 응답을 생성하는 데 오류가 발생했습니다.' }]);
+    } finally {
+      setLoading(false);
+      scrollToBottom();
+    }
   };
 
   return (
@@ -68,13 +100,23 @@ export default function HealthDashboard() {
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {messages.map((msg, i) => (
               <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[80%] p-3 rounded-2xl text-sm ${
-                  msg.role === 'user' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-800'
+                <div className={`max-w-[80%] p-3 rounded-2xl text-sm whitespace-pre-wrap ${
+                  msg.role === 'user' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-800 prose prose-sm max-w-none'
                 }`}>
-                  {msg.content}
+                  {msg.role === 'user' ? msg.content : (
+                    <ReactMarkdown>{msg.content}</ReactMarkdown>
+                  )}
                 </div>
               </div>
             ))}
+            {loading && (
+              <div className="flex justify-start">
+                <div className="max-w-[80%] p-3 rounded-2xl text-sm bg-slate-100">
+                  <span className="animate-pulse">입력 중...</span>
+                </div>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
           </div>
 
           <div className="p-4 border-t">
