@@ -1,20 +1,71 @@
 "use client";
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Activity, Heart, Droplets, Utensils, Send } from 'lucide-react';
 import Header from './components/Header';
 import ReactMarkdown from 'react-markdown';
+import { useAuthStore } from '@/store/authStore';
 
 const initialMessages = [
   { role: 'ai', content: '안녕하세요! 저는 VitalSense AI 건강 분석기입니다. 건강에 관한 무엇이든 물어보세요. 혈당, 혈압, 식단, 운동 등 다양한 건강 정보를 알려드릴 수 있습니다.' }
 ];
 
 export default function HealthDashboard() {
+  const router = useRouter();
+  const { isLoggedIn, checkAuth } = useAuthStore();
   const [messages, setMessages] = useState(initialMessages);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const [healthData, setHealthData] = useState({
+    bp: { value: '', status: '' },
+    sugar: { value: '', status: '' },
+    bmi: { value: '', status: '' },
+  });
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setMounted(true);
+    checkAuth();
+  }, [checkAuth]);
+
+  useEffect(() => {
+    if (mounted && !isLoggedIn) {
+      router.push('/login');
+    }
+  }, [mounted, isLoggedIn, router]);
+
+  useEffect(() => {
+    const fetchHealthData = async () => {
+      try {
+        const [bpRes, sugarRes] = await Promise.all([
+          fetch('/api/posts?type=bp'),
+          fetch('/api/posts?type=blood-sugar'),
+        ]);
+
+        const bpData = await bpRes.json();
+        const sugarData = await sugarRes.json();
+
+        setHealthData({
+          bp: bpData.ok && bpData.items?.length > 0
+            ? { value: bpData.items[0].title.replace('혈압 기록 - ', ''), status: '정상' }
+            : { value: '기록없음', status: '' },
+          sugar: sugarData.ok && sugarData.items?.length > 0
+            ? { value: sugarData.items[0].title.split('- ')[1]?.split(' ')[0] || '기록없음', status: '주의' }
+            : { value: '기록없음', status: '' },
+          bmi: { value: '기록없음', status: '' },
+        });
+      } catch (error) {
+        console.error('Failed to fetch health data:', error);
+      }
+    };
+
+    if (isLoggedIn) {
+      fetchHealthData();
+    }
+  }, [isLoggedIn]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -56,20 +107,33 @@ export default function HealthDashboard() {
       <main className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
         
         {/* 왼쪽: 생체 지표 카드 섹션 */}
-        <div className="lg:col-span-2 space-y-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {/* 혈압 카드에 경로 추가 */}
+<div className="lg:col-span-2 space-y-6">
+          <div className="grid grid-cols-3 gap-2 sm:gap-4">
             <HealthCard 
               title="혈압" 
-              value="120/80" 
+              value={healthData.bp.value || '기록없음'} 
               unit="mmHg" 
-              icon={<Heart className="text-red-500" />} 
-              status="정상" 
-              href="/blood-pressure" 
+              icon={<Heart className="text-red-500 w-4 h-4 sm:w-5 sm:h-5" />} 
+              status={healthData.bp.status || ''} 
+              href="/blood-pressure"
             />
-            <HealthCard title="혈당" value="105" unit="mg/dL" icon={<Droplets className="text-blue-500" />} status="주의" color="text-orange-500" />
-            <HealthCard title="체중" value="72.5" unit="kg" icon={<Activity className="text-green-500" />} status="유지" />
-            <HealthCard title="BMI" value="23.1" unit="Index" icon={<Activity className="text-purple-500" />} status="정상" />
+            <HealthCard 
+              title="혈당" 
+              value={healthData.sugar.value || '기록없음'} 
+              unit="mg/dL" 
+              icon={<Droplets className="text-blue-500 w-4 h-4 sm:w-5 sm:h-5" />} 
+              status={healthData.sugar.status || ''} 
+              color="text-orange-500"
+              href="/blood-sugar"
+            />
+            <HealthCard 
+              title="BMI" 
+              value={healthData.bmi.value || '기록없음'} 
+              unit="Index" 
+              icon={<Activity className="text-purple-500 w-4 h-4 sm:w-5 sm:h-5" />} 
+              status={healthData.bmi.status || ''}
+              href="/weight"
+            />
           </div>
 
           {/* 식단 및 운동 요약 */}
@@ -100,7 +164,7 @@ export default function HealthDashboard() {
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {messages.map((msg, i) => (
               <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[80%] p-3 rounded-2xl text-sm whitespace-pre-wrap ${
+                <div className={`max-w-[80%] p-3 rounded-2xl text-base whitespace-pre-wrap ${
                   msg.role === 'user' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-800 prose prose-sm max-w-none'
                 }`}>
                   {msg.role === 'user' ? msg.content : (
@@ -141,15 +205,15 @@ export default function HealthDashboard() {
 }
 
 // 수정된 HealthCard 컴포넌트
-function HealthCard({ title, value, unit, icon, status, color = "text-green-500", href }: any) {
+function HealthCard({ title, value, unit, icon, status, color = "text-green-500", href, className = "" }: any) {
   const CardContent = (
-    <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition cursor-pointer h-full">
+    <div className={`bg-white p-3 sm:p-4 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition cursor-pointer h-full ${className}`}>
       <div className="flex justify-between items-start mb-2">
-        <div className="p-2 bg-slate-50 rounded-lg">{icon}</div>
-        <span className={`text-xs font-bold ${color}`}>{status}</span>
+        <div className="p-1.5 sm:p-2 bg-slate-50 rounded-lg">{icon}</div>
+        <span className={`text-[10px] sm:text-xs font-bold ${color}`}>{status}</span>
       </div>
-      <div className="text-2xl font-bold">{value}</div>
-      <div className="text-xs text-slate-400">{title} ({unit})</div>
+      <div className="text-lg sm:text-2xl font-bold">{value}</div>
+      <div className="text-xs text-slate-400">{title}</div>
     </div>
   );
 

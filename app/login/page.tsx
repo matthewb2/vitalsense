@@ -1,38 +1,194 @@
 "use client";
 
-import React from 'react';
-import { signIn, useSession } from 'next-auth/react';
+import React, { useState, useEffect } from 'react';
 import Header from '../components/Header';
-import { HeartPulse } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { HeartPulse, Mail, Lock, Eye, EyeOff, ArrowLeft } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
+import { useAuthStore } from '@/store/authStore';
+
 
 export default function LoginPage() {
-  const { data: session } = useSession();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const { setUser } = useAuthStore();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  React.useEffect(() => {
-    if (session) {
-      router.push('/');
+  useEffect(() => {
+    const oauth = searchParams.get('oauth');
+    const userParam = searchParams.get('user');
+    
+    if (oauth === 'success' && userParam) {
+      try {
+        console.log('Raw userParam:', userParam);
+        const userData = JSON.parse(userParam);
+        console.log('OAuth success! User data:', userData);
+        
+        // Token exists → existing user → login success
+        if (userData.accessToken || userData.token) {
+          setUser(userData);
+          alert('구글 로그인 성공! 이메일: ' + userData.email + ', 이름: ' + userData.name);
+          router.push('/');
+        } 
+        // No token but has email → new user → go to signup
+        else if (userData.email) {
+          alert('신규 회원이십니다. 회원가입 페이지로 이동합니다.');
+          const params = new URLSearchParams({
+            email: userData.email,
+            name: userData.name || '',
+            provider: 'google'
+          });
+          router.push(`/signup?${params.toString()}`);
+        }
+        // No info → error
+        else {
+          setError('회원 정보를 찾을 수 없습니다.');
+        }
+        return;
+      } catch (err) {
+        console.error('OAuth user parse error:', err);
+        setError('로그인 데이터 처리 중 오류');
+      }
     }
-  }, [session, router]);
+    
+    const oauthError = searchParams.get('error');
+    if (oauthError) {
+      setError('구글 로그인에 실패했습니다.');
+    }
+  }, [searchParams, setUser, router]);
+
+  const handleEmailLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    try {
+      const response = await fetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await response.json();
+
+      if (data.ok) {
+        console.log('Login API response:', data);
+        const userData = {
+          ...data.item,
+          token: data.item?.token,
+          accessToken: data.item?.token?.accessToken,
+        };
+        console.log('User data to save:', userData);
+        setUser(userData);
+        router.push('/');
+      } else {
+        setError(data.message || '로그인에 실패했습니다.');
+      }
+    } catch (err) {
+      setError('오류가 발생했습니다.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleLogin = () => {
+    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '';
+    const baseUrl = process.env.NEXT_PUBLIC_URL || 'http://localhost:3000';
+    const redirectUri = baseUrl + '/api/auth/callback';
+    const scope = encodeURIComponent('openid profile email');
+    
+    window.location.href = 
+      `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scope}&access_type=offline&prompt=select_account`;
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 p-4">
       <Header />
 
-      <main className="max-w-md mx-auto mt-20">
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-8 text-center">
+      <main className="max-w-md mx-auto mt-10">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-2 text-slate-500 hover:text-blue-600 mb-4"
+        >
+          <ArrowLeft size={20} />
+          메인으로
+        </Link>
+
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-8">
           <div className="flex justify-center mb-6">
             <div className="bg-blue-600 p-4 rounded-2xl">
               <HeartPulse className="text-white" size={48} />
             </div>
           </div>
 
-          <h1 className="text-2xl font-bold mb-2">VitalSense AI에 오신 것을 환영합니다</h1>
-          <p className="text-slate-500 mb-8">구글 계정으로 로그인하여 AI 건강 분석을 받아보세요.</p>
+          <h1 className="text-2xl font-bold text-center mb-2">로그인</h1>
+          <p className="text-slate-500 text-center mb-8">이메일과 비밀번호로 로그인하세요</p>
+
+          <form onSubmit={handleEmailLogin} className="space-y-4 mb-6">
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">이메일</label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="email@example.com"
+                  className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">비밀번호</label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="비밀번호를 입력하세요"
+                  className="w-full pl-10 pr-12 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
+              </div>
+            </div>
+
+            {error && (
+              <p className="text-red-500 text-sm text-center">{error}</p>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition disabled:opacity-50"
+            >
+              {loading ? '로그인 중...' : '로그인'}
+            </button>
+          </form>
+
+<div className="relative my-6">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-slate-200"></div>
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-4 bg-white text-slate-400">또는</span>
+            </div>
+          </div>
 
           <button
-            onClick={() => signIn('google', { callbackUrl: '/' })}
+            onClick={handleGoogleLogin}
             className="w-full bg-white border border-slate-200 text-slate-700 py-3 px-4 rounded-xl font-semibold hover:bg-slate-50 transition flex items-center justify-center gap-3"
           >
             <svg viewBox="0 0 24 24" className="w-5 h-5">
@@ -43,6 +199,13 @@ export default function LoginPage() {
             </svg>
             Google로 시작하기
           </button>
+
+          <p className="text-center text-slate-500 text-sm mt-6">
+            아직 계정이 없으신가요?{' '}
+            <Link href="/signup" className="text-blue-600 hover:underline">
+              회원가입
+            </Link>
+          </p>
         </div>
       </main>
     </div>
