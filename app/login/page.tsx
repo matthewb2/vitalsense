@@ -1,22 +1,93 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import Header from '../components/Header';
 import { HeartPulse, Mail, Lock, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuthStore } from '@/store/authStore';
+import { signIn, signOut, useSession } from 'next-auth/react';
 
-
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { setUser } = useAuthStore();
+  const { data: session, status } = useSession();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    const oauth = searchParams.get('oauth');
+    
+    console.log('Session status:', status, 'session:', session, 'oauth:', oauth);
+    
+    if (status === 'authenticated' && session?.user && oauth === 'google') {
+      const user = session.user as any;
+      console.log('Google login detected:', user);
+      
+      const providerAccountId = user.providerAccountId || user.sub;
+      const googleEmail = user.email;
+      const googleName = user.name;
+      const googleImage = user.image;
+      
+      if (providerAccountId) {
+        processGoogleLogin(googleEmail, googleName, googleImage, providerAccountId);
+      }
+    }
+  }, [status, session, searchParams]);
+
+  const processGoogleLogin = async (googleEmail: string | null, googleName: string | null, googleImage: string | null, providerAccountId: string) => {
+    console.log('Processing Google login:', { providerAccountId, googleEmail, googleName });
+    
+    try {
+      const response = await fetch('/api/auth/oauth-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          providerAccountId,
+          email: googleEmail,
+          name: googleName,
+          image: googleImage,
+        }),
+      });
+      
+      const data = await response.json();
+      console.log('OAuth login response:', data);
+      
+      if (response.ok && (data.ok || data._id)) {
+        const userItem = data.item || data;
+        const userData = {
+          _id: userItem._id,
+          email: userItem.email || googleEmail,
+          name: userItem.name || googleName,
+          type: userItem.type,
+          image: userItem.image || googleImage,
+          loginType: 'google',
+          accessToken: data.accessToken || userItem.token?.accessToken,
+          token: { 
+            accessToken: data.accessToken || userItem.token?.accessToken,
+            refreshToken: userItem.token?.refreshToken 
+          },
+        };
+        setUser(userData);
+        alert('로그인 성공!');
+        router.push('/');
+      } else {
+        const params = new URLSearchParams({
+          email: googleEmail || '',
+          name: googleName || '',
+          provider: 'google',
+          providerAccountId,
+        });
+        router.push(`/signup?${params.toString()}`);
+      }
+    } catch (err) {
+      console.error('OAuth login error:', err);
+    }
+  };
 
   useEffect(() => {
     const oauth = searchParams.get('oauth');
@@ -94,14 +165,19 @@ export default function LoginPage() {
     }
   };
 
-  const handleGoogleLogin = () => {
-    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '';
-    const baseUrl = process.env.NEXT_PUBLIC_URL || 'http://localhost:3000';
-    const redirectUri = baseUrl + '/api/auth/callback';
-    const scope = encodeURIComponent('openid profile email');
+  const handleGoogleLogin = async () => {
+    console.log('Starting Google OAuth...');
     
-    window.location.href = 
-      `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scope}&access_type=offline&prompt=select_account`;
+    if (status === 'authenticated') {
+      console.log('Signing out existing session first...');
+      await signOut({ redirect: false });
+    }
+    
+    const result = await signIn('google', { callbackUrl: '/login?oauth=google' });
+    if (result?.error) {
+      console.error('Sign in error:', result.error);
+      setError('Google 로그인에 실패했습니다.');
+    }
   };
 
   return (
@@ -209,5 +285,13 @@ export default function LoginPage() {
         </div>
       </main>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-slate-50 flex items-center justify-center"><p>로딩 중...</p></div>}>
+      <LoginForm />
+    </Suspense>
   );
 }

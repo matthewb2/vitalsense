@@ -16,9 +16,6 @@ export const authOptions: NextAuthOptions = {
       }
     }),
   ],
-  http: {
-    timeout: 60000,
-  },
   callbacks: {
     async session({ session, token, user }) {
       if (session?.user) {

@@ -1,13 +1,13 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import Header from '../components/Header';
 import { HeartPulse, Mail, Lock, User, ArrowLeft, CheckCircle, Eye, EyeOff } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
 
-export default function SignupPage() {
+function SignupForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { setUser } = useAuthStore();
@@ -67,15 +67,19 @@ export default function SignupPage() {
       console.log('Signup response:', data);
 
       if (data.ok || data._id) {
+        const userItem = data.item || data;
         const userData = {
-          _id: data._id || data.item?._id,
-          email: data.email || data.item?.email,
-          name: data.name || data.item?.name,
-          type: data.type || data.item?.type,
-          image: data.image || data.item?.image,
+          _id: userItem._id,
+          email: userItem.email,
+          name: userItem.name,
+          type: userItem.type,
+          image: userItem.image,
           loginType: 'google',
-          accessToken: data.accessToken || data.token?.accessToken || data.item?.token?.accessToken,
-          token: { accessToken: data.accessToken || data.token?.accessToken || data.item?.token?.accessToken },
+          accessToken: data.accessToken || userItem.token?.accessToken,
+          token: { 
+            accessToken: data.accessToken || userItem.token?.accessToken,
+            refreshToken: userItem.token?.refreshToken 
+          },
         };
         setUser(userData);
         router.push('/');
@@ -201,5 +205,13 @@ export default function SignupPage() {
         </Link>
       </main>
     </div>
+  );
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-slate-50 flex items-center justify-center"><p>로딩 중...</p></div>}>
+      <SignupForm />
+    </Suspense>
   );
 }

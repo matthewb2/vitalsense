@@ -8,10 +8,11 @@ const SIGNUP_OAUTH_URL = process.env.API_URL + '/users/signup/oauth';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { email, password, loginType, googleCode } = body;
+    const { email, password, loginType, googleCode, extra } = body;
 
-    // Google OAuth signup
-    if (loginType === 'google' && googleCode) {
+    const providerAccountId = googleCode || extra?.providerAccountId;
+
+    if (loginType === 'google' && providerAccountId) {
       console.log('Calling signup oauth:', SIGNUP_OAUTH_URL);
       const response = await fetch(SIGNUP_OAUTH_URL, {
         method: 'POST',
@@ -22,7 +23,10 @@ export async function POST(req: NextRequest) {
         body: JSON.stringify({
           type: 'user',
           loginType: 'google',
-          providerAccountId: googleCode,
+          email: body.email,
+          name: body.name,
+          image: body.image,
+          extra: { providerAccountId },
         }),
       });
 
@@ -33,7 +37,10 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({
           ok: 1,
           item: data.item || data,
-          accessToken: data.item?.token?.accessToken || data.token?.accessToken
+          accessToken: data.item?.token?.accessToken || data.token?.accessToken,
+          email: data.email || data.item?.email,
+          name: data.name || data.item?.name,
+          image: data.image || data.item?.image,
         });
       }
 

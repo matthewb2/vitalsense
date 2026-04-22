@@ -9,8 +9,8 @@ interface User {
   image?: string;
   accessToken?: string;
   token?: {
-    accessToken: string;
-    refreshToken: string;
+    accessToken?: string;
+    refreshToken?: string;
   };
   extra?: {
     birthday?: string;
