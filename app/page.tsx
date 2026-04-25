@@ -1,30 +1,21 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Activity, Heart, Droplets, Utensils, Send } from 'lucide-react';
+import { Activity, Heart, Droplets, Utensils, Search } from 'lucide-react';
 import Header from './components/Header';
-import ReactMarkdown from 'react-markdown';
 import { useAuthStore } from '@/store/authStore';
-
-const initialMessages = [
-  { role: 'ai', content: '안녕하세요! 저는 VitalSense AI 건강 분석기입니다. 건강에 관한 무엇이든 물어보세요. 혈당, 혈압, 식단, 운동 등 다양한 건강 정보를 알려드릴 수 있습니다.' }
-];
 
 export default function HealthDashboard() {
   const router = useRouter();
   const { isLoggedIn, checkAuth } = useAuthStore();
-  const [messages, setMessages] = useState(initialMessages);
-  const [input, setInput] = useState('');
-  const [loading, setLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [healthData, setHealthData] = useState({
     bp: { value: '', status: '' },
     sugar: { value: '', status: '' },
     bmi: { value: '', status: '' },
   });
-  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -66,39 +57,6 @@ export default function HealthDashboard() {
       fetchHealthData();
     }
   }, [isLoggedIn]);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  const handleSendMessage = async () => {
-    if (!input.trim() || loading) return;
-    
-    const userMessage = input.trim();
-    setInput('');
-    
-    const newMessages = [...messages, { role: 'user', content: userMessage }];
-    setMessages(newMessages);
-    setLoading(true);
-    scrollToBottom();
-
-    try {
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: newMessages }),
-      });
-      
-      const data = await response.json();
-      setMessages([...newMessages, { role: 'ai', content: data.content }]);
-    } catch (error) {
-      console.error('Chat error:', error);
-      setMessages([...newMessages, { role: 'ai', content: '죄송합니다. 응답을 생성하는 데 오류가 발생했습니다.' }]);
-    } finally {
-      setLoading(false);
-      scrollToBottom();
-    }
-  };
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 p-4 md:p-8">
@@ -154,48 +112,25 @@ export default function HealthDashboard() {
           </div>
         </div>
 
-        {/* 오른쪽: AI 채팅 인터페이스 */}
-        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 flex flex-col h-[600px]">
-          <div className="p-4 border-b bg-blue-50 rounded-t-2xl flex items-center gap-2">
-            <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-            <span className="font-bold text-blue-700">AI 건강 분석가</span>
-          </div>
+        {/* 오른쪽: Google 검색 스타일 AI 채팅 */}
+        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-4">
+          <Link href="/chat" className="block">
+            <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-full hover:shadow-md transition cursor-pointer">
+              <Search size={20} className="text-slate-400" />
+              <span className="text-slate-400">AI에게 물어보세요...</span>
+            </div>
+          </Link>
           
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {messages.map((msg, i) => (
-              <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[80%] p-3 rounded-2xl text-base whitespace-pre-wrap ${
-                  msg.role === 'user' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-800 prose prose-sm max-w-none'
-                }`}>
-                  {msg.role === 'user' ? msg.content : (
-                    <ReactMarkdown>{msg.content}</ReactMarkdown>
-                  )}
-                </div>
+          {/* 최근 질문 (선택적) */}
+          <div className="mt-4 pt-4 border-t">
+            <p className="text-xs text-slate-400 mb-2">추천 질문</p>
+            <div className="space-y-2">
+              <div className="text-sm text-slate-600 p-2 hover:bg-slate-50 rounded-lg cursor-pointer">
+                혈압이 140/90이면 정상인가요?
               </div>
-            ))}
-            {loading && (
-              <div className="flex justify-start">
-                <div className="max-w-[80%] p-3 rounded-2xl text-sm bg-slate-100">
-                  <span className="animate-pulse">입력 중...</span>
-                </div>
+              <div className="text-sm text-slate-600 p-2 hover:bg-slate-50 rounded-lg cursor-pointer">
+                공복혈당 126mg/dL는 높은 것인가요?
               </div>
-            )}
-            <div ref={messagesEndRef} />
-          </div>
-
-          <div className="p-4 border-t">
-            <div className="relative flex items-center">
-              <input 
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                placeholder="상태를 물어보세요"
-                className="w-full p-3 pr-12 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <button onClick={handleSendMessage} className="absolute right-2 p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
-                <Send size={18} />
-              </button>
             </div>
           </div>
         </div>
