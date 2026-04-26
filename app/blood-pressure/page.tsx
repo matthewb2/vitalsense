@@ -66,15 +66,20 @@ const formatTime = (dateTime: string) => {
             const contentMatch = item.content.match(/수축기 혈압: (\d+)mmHg\n확장기 혈압: (\d+)mmHg/);
             const dateTimeMatch = item.content.match(/측정 일시: (.+)/);
             const fullDateTime = dateTimeMatch ? dateTimeMatch[1] : '';
-            console.log('Parsed datetime:', fullDateTime);
-            const dateParts = fullDateTime.split(' ');
-            const dateOnly = dateParts[0] || fullDateTime;
-            const timeOnly = dateParts[1] || '';
+            console.log('Parsed datetime raw:', fullDateTime);
+            
+            // Split by newline first to get clean date and time
+            const lines = fullDateTime.split('\n');
+            const dateTimeLine = lines[0] || '';
+            const dateTimeParts = dateTimeLine.split(' ');
+            const dateOnly = dateTimeParts[0] || dateTimeLine;
+            const timeOnly = dateTimeParts[1] || '';
+            
             return {
               _id: item._id,
               date: dateOnly,
               time: timeOnly,
-              formattedTime: fullDateTime ? formatTime(fullDateTime) : '',
+              formattedTime: fullDateTime ? formatTime(dateTimeLine) : '',
               systolic: contentMatch ? contentMatch[1] : '',
               diastolic: contentMatch ? contentMatch[2] : '',
             };

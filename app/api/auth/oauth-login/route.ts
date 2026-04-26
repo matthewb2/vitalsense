@@ -22,11 +22,16 @@ export async function POST(req: NextRequest) {
     });
     
     let loginData = await loginWithResponse.json();
-    console.log('Login/with response:', loginData);
+    console.log('Login/with response:', JSON.stringify(loginData, null, 2));
     
     if (loginWithResponse.status === 200 && (loginData.ok || loginData._id)) {
       const userObj = loginData.ok ? loginData.item : loginData;
-      const accessToken = loginData.token?.accessToken || loginData.accessToken;
+      
+      // Extract token from the correct location
+      const accessToken = loginData.item?.token?.accessToken || loginData.token?.accessToken;
+      const refreshToken = loginData.item?.token?.refreshToken || loginData.token?.refreshToken;
+      
+      console.log('Extracted tokens:', { accessToken, refreshToken });
       
       return NextResponse.json({
         ok: true,
@@ -34,9 +39,12 @@ export async function POST(req: NextRequest) {
         email: userObj.email,
         name: userObj.name,
         type: userObj.type,
-        image: userObj.image,
+        image: userObj.image || image,
         accessToken: accessToken,
-        token: { accessToken },
+        token: { 
+          accessToken: accessToken,
+          refreshToken: refreshToken
+        },
       });
     }
     

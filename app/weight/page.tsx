@@ -4,14 +4,12 @@ import React, { useState, useEffect } from 'react';
 import Header from '../components/Header';
 import { Activity, Calendar, Save, List, Plus, Ruler, Edit2, Trash2, X } from 'lucide-react';
 import Link from 'next/link';
-
 import { useAuthStore } from '@/store/authStore';
 
 const API_URL = '/api/posts';
 
 export default function WeightPage() {
-  const { user } = useAuthStore();
-  const token = user?.accessToken || '';
+  const { user, checkAuth } = useAuthStore();
   const [activeTab, setActiveTab] = useState<'record' | 'list'>('list');
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -19,6 +17,10 @@ export default function WeightPage() {
   const [history, setHistory] = useState<any[]>([]);
   const [editModal, setEditModal] = useState<{open: boolean; item: any | null}>({open: false, item: null});
   const [editForm, setEditForm] = useState({ height: '', weight: '' });
+
+  useEffect(() => {
+    checkAuth();
+  }, [checkAuth]);
 
   const getInitialBodyData = () => {
     if (typeof window === 'undefined') return { height: '', weight: '' };
@@ -45,12 +47,17 @@ export default function WeightPage() {
   }, []);
 
   useEffect(() => {
-    if (user?._id && token) {
-      fetchHistory();
+    if (user?._id) {
+      const currentToken = user?.token?.accessToken || user?.accessToken;
+      if (currentToken) {
+        fetchHistory(currentToken);
+      }
     }
-  }, [user?._id, token]);
+  }, [user?._id]);
 
-  const fetchHistory = async () => {
+  const fetchHistory = async (token?: string) => {
+    if (!token) return;
+
     try {
       const response = await fetch(`${API_URL}?type=weight`, {
         method: 'GET',
@@ -60,11 +67,11 @@ export default function WeightPage() {
         },
       });
       const data = await response.json();
-      
+
       if (data.ok && data.item) {
         const userId = user?._id;
         const filtered = data.item.filter((item: any) => item.user?._id === userId);
-        
+
         const parsed = filtered.map((item: any) => {
           const contentMatch = item.content.match(/체중: ([\d.]+)kg/);
           const heightMatch = item.content.match(/신장: ([\d.]+)cm/);
@@ -75,7 +82,7 @@ export default function WeightPage() {
             weight: contentMatch ? contentMatch[1] : '',
           };
         });
-        
+
         setHistory(parsed);
       }
     } catch (err) {
@@ -88,16 +95,26 @@ export default function WeightPage() {
     setLoading(true);
     setError('');
 
+    checkAuth();
+    const currentUser = useAuthStore.getState().user;
+    const currentToken = currentUser?.token?.accessToken || currentUser?.accessToken;
+
+    if (!currentToken) {
+      setError('로그인이 필요합니다.');
+      setLoading(false);
+      return;
+    }
+
     try {
       const bodyData = { height: formData.height, weight: formData.weight };
       localStorage.setItem('bodyData', JSON.stringify(bodyData));
-      
+
       const response = await fetch(API_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'client-id': 'vitalsense',
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${currentToken}`
         },
         body: JSON.stringify({
           type: 'weight',
@@ -139,17 +156,20 @@ export default function WeightPage() {
 
   const handleDelete = async (item: any) => {
     if (!confirm('이 기록을 삭제하시겠습니까?')) return;
-    
+
+    const currentToken = user?.token?.accessToken || user?.accessToken;
+    if (!currentToken) return;
+
     try {
       const response = await fetch(`${API_URL}?id=${item._id}`, {
         method: 'DELETE',
         headers: {
           'client-id': 'vitalsense',
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${currentToken}`
         },
       });
       const data = await response.json();
-      
+
       if (data.ok) {
         setHistory(history.filter(h => h._id !== item._id));
       } else {
@@ -163,14 +183,20 @@ export default function WeightPage() {
   const handleUpdate = async () => {
     if (!editModal.item) return;
     setLoading(true);
-    
+
+    const currentToken = user?.token?.accessToken || user?.accessToken;
+    if (!currentToken) {
+      setLoading(false);
+      return;
+    }
+
     try {
       const response = await fetch(API_URL, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
           'client-id': 'vitalsense',
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${currentToken}`
         },
         body: JSON.stringify({
           id: editModal.item._id,
@@ -178,12 +204,12 @@ export default function WeightPage() {
           content: `측정 일시: ${editModal.item.date}\n신장: ${editForm.height}cm\n체중: ${editForm.weight}kg`,
         }),
       });
-      
+
       const data = await response.json();
-      
+
       if (data.ok) {
-        setHistory(history.map(h => 
-          h._id === editModal.item._id 
+        setHistory(history.map(h =>
+          h._id === editModal.item._id
             ? { ...h, height: editForm.height, weight: editForm.weight }
             : h
         ));
@@ -192,7 +218,7 @@ export default function WeightPage() {
         setError(data.message || '수정에 실패했습니다.');
       }
     } catch (err) {
-      setError('오류가 발생했습니다.');
+      setError('오류가 발생합니다.');
     } finally {
       setLoading(false);
     }
@@ -204,17 +230,17 @@ export default function WeightPage() {
 
       <main className="max-w-4xl mx-auto mt-6">
         <div className="flex bg-white p-1.5 rounded-2xl shadow-sm mb-8 w-fit mx-auto border border-slate-200">
-          <TabButton 
-            active={activeTab === 'list'} 
-            onClick={() => setActiveTab('list')} 
-            icon={<List size={18} />} 
-            label="기록 목록" 
+          <TabButton
+            active={activeTab === 'list'}
+            onClick={() => setActiveTab('list')}
+            icon={<List size={18} />}
+            label="기록 목록"
           />
-          <TabButton 
-            active={activeTab === 'record'} 
-            onClick={() => setActiveTab('record')} 
-            icon={<Plus size={18} />} 
-            label="수치 기록" 
+          <TabButton
+            active={activeTab === 'record'}
+            onClick={() => setActiveTab('record')}
+            icon={<Plus size={18} />}
+            label="수치 기록"
           />
         </div>
 
@@ -277,8 +303,8 @@ export default function WeightPage() {
                 <label className="text-sm font-bold text-slate-600 flex items-center gap-1">
                   <Calendar size={14} /> 측정 날짜
                 </label>
-                <input 
-                  type="date" 
+                <input
+                  type="date"
                   className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-green-500"
                   value={formData.date}
                   onChange={(e) => setFormData({...formData, date: e.target.value})}
@@ -289,8 +315,8 @@ export default function WeightPage() {
                   <Ruler size={14} /> 신장
                 </label>
                 <div className="relative">
-                  <input 
-                    type="number" 
+                  <input
+                    type="number"
                     placeholder="170"
                     step="0.1"
                     className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 font-mono text-lg"
@@ -303,8 +329,8 @@ export default function WeightPage() {
               <div className="space-y-2">
                 <label className="text-sm font-bold text-slate-600">체중</label>
                 <div className="relative">
-                  <input 
-                    type="number" 
+                  <input
+                    type="number"
                     placeholder="70.0"
                     step="0.1"
                     className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 font-mono text-lg"
@@ -314,12 +340,12 @@ export default function WeightPage() {
                   <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-bold">kg</span>
                 </div>
               </div>
-              
+
               {error && (
                 <p className="text-red-500 text-sm text-center">{error}</p>
               )}
-              
-              <button 
+
+              <button
                 type="submit"
                 disabled={loading}
                 className="w-full py-4 bg-green-500 text-white rounded-2xl font-bold hover:bg-green-600 transition shadow-lg shadow-green-100 disabled:opacity-50"
@@ -334,9 +360,9 @@ export default function WeightPage() {
           </div>
         )}
       </main>
-      
-      <EditModal 
-        open={editModal.open} 
+
+      <EditModal
+        open={editModal.open}
         item={editModal.item}
         form={editForm}
         setForm={setEditForm}
@@ -350,7 +376,7 @@ export default function WeightPage() {
 
 function TabButton({ active, onClick, icon, label }: { active: boolean; onClick: () => void; icon: React.ReactNode; label: string }) {
   return (
-    <button 
+    <button
       onClick={onClick}
       className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${
         active ? 'bg-green-500 text-white shadow-md' : 'text-slate-500 hover:text-slate-800'
@@ -363,7 +389,7 @@ function TabButton({ active, onClick, icon, label }: { active: boolean; onClick:
 
 function EditModal({ open, item, form, setForm, onClose, onSave, loading }: any) {
   if (!open) return null;
-  
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <div className="bg-white rounded-2xl p-6 w-full max-w-md mx-4">
@@ -373,12 +399,12 @@ function EditModal({ open, item, form, setForm, onClose, onSave, loading }: any)
             <X size={20} />
           </button>
         </div>
-        
+
         <div className="space-y-4">
           <div className="space-y-2">
             <label className="text-sm font-bold text-slate-600">신장 (cm)</label>
-            <input 
-              type="number" 
+            <input
+              type="number"
               step="0.1"
               className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 font-mono"
               value={form.height}
@@ -387,8 +413,8 @@ function EditModal({ open, item, form, setForm, onClose, onSave, loading }: any)
           </div>
           <div className="space-y-2">
             <label className="text-sm font-bold text-slate-600">체중 (kg)</label>
-            <input 
-              type="number" 
+            <input
+              type="number"
               step="0.1"
               className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 font-mono"
               value={form.weight}
@@ -396,7 +422,7 @@ function EditModal({ open, item, form, setForm, onClose, onSave, loading }: any)
             />
           </div>
         </div>
-        
+
         <div className="flex gap-3 mt-6">
           <button
             onClick={onClose}
