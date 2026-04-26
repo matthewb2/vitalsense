@@ -50,34 +50,16 @@ export default function HealthDashboard() {
         const sugarData = await sugarRes.json();
         const weightData = await weightRes.json();
 
-        console.log('Health data response:', { bpData, sugarData, weightData });
-
-        // Filter by current user and get most recent item
-        const userId = user?._id;
-        console.log('Current user ID:', userId, 'Type:', typeof userId);
-        
         const allBpItems = bpData.item || [];
         const allSugarItems = sugarData.item || [];
         const allWeightItems = weightData.item || [];
         
-        console.log('First BP item structure:', JSON.stringify(allBpItems[0], null, 2));
-        
-        // Try to find items by user ID in extra field
-        const bpItems = allBpItems.filter((item: any) => String(item.extra?.userId) === String(userId));
-        const sugarItems = allSugarItems.filter((item: any) => String(item.extra?.userId) === String(userId));
-        const weightItems = allWeightItems.filter((item: any) => String(item.extra?.userId) === String(userId));
-        
-        console.log('Filtered items by extra.userId:', { bpItems: bpItems.length, sugarItems: sugarItems.length, weightItems: weightItems.length });
-        
-        // Fallback to first items if no filter matches
-        const latestBp = bpItems[0] || allBpItems[0];
-        const latestSugar = sugarItems[0] || allSugarItems[0];
-        const latestWeight = weightItems[0] || allWeightItems[0];
+        // Get most recent items (first item is most recent)
+        const latestBp = allBpItems[0];
+        const latestSugar = allSugarItems[0];
+        const latestWeight = allWeightItems[0];
 
-        // Blood pressure: extract from title like "혈압 기록 - 120/80"
-        // Blood sugar: extract from title like "혈당 - 126 mg/dL (공복)"
-        // Weight: extract from title like "체중 기록 - 70kg"
-        
+        // Extract values from title
         const bpValue = latestBp 
           ? latestBp.title.replace('혈압 기록 - ', '') 
           : '기록없음';
