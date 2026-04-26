@@ -55,10 +55,14 @@ function LoginForm() {
       });
       
       const data = await response.json();
-      console.log('OAuth login response:', data);
+      console.log('OAuth login response:', JSON.stringify(data, null, 2));
       
       if (response.ok && (data.ok || data._id)) {
         const userItem = data.item || data;
+        
+        // Extract accessToken from various possible locations
+        const accessToken = data.accessToken || data.item?.token?.accessToken || data.item?.accessToken || userItem.token?.accessToken;
+        
         const userData = {
           _id: userItem._id,
           email: userItem.email || googleEmail,
@@ -66,12 +70,13 @@ function LoginForm() {
           type: userItem.type,
           image: userItem.image || googleImage,
           loginType: 'google',
-          accessToken: data.accessToken || userItem.token?.accessToken,
+          accessToken: accessToken,
           token: { 
-            accessToken: data.accessToken || userItem.token?.accessToken,
-            refreshToken: userItem.token?.refreshToken 
+            accessToken: accessToken,
+            refreshToken: data.item?.token?.refreshToken || userItem.token?.refreshToken 
           },
         };
+        console.log('userData to save:', JSON.stringify(userData, null, 2));
         setUser(userData);
         alert('로그인 성공!');
         router.push('/');

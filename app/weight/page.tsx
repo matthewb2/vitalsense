@@ -10,8 +10,7 @@ import { useAuthStore } from '@/store/authStore';
 const API_URL = '/api/posts';
 
 export default function WeightPage() {
-  const { user } = useAuthStore();
-  const token = user?.accessToken || '';
+  const { user, isLoggedIn, checkAuth } = useAuthStore();
   const [activeTab, setActiveTab] = useState<'record' | 'list'>('list');
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -19,6 +18,10 @@ export default function WeightPage() {
   const [history, setHistory] = useState<any[]>([]);
   const [editModal, setEditModal] = useState<{open: boolean; item: any | null}>({open: false, item: null});
   const [editForm, setEditForm] = useState({ height: '', weight: '' });
+
+  useEffect(() => {
+    checkAuth();
+  }, [checkAuth]);
 
   const getInitialBodyData = () => {
     if (typeof window === 'undefined') return { height: '', weight: '' };
@@ -45,12 +48,17 @@ export default function WeightPage() {
   }, []);
 
   useEffect(() => {
-    if (user?._id && token) {
-      fetchHistory();
+    if (user?._id) {
+      const currentToken = user?.token?.accessToken || user?.accessToken;
+      if (currentToken) {
+        fetchHistory(currentToken);
+      }
     }
-  }, [user?._id, token]);
+  }, [user?._id]);
 
-  const fetchHistory = async () => {
+  const fetchHistory = async (token?: string) => {
+    if (!token) return;
+    
     try {
       const response = await fetch(`${API_URL}?type=weight`, {
         method: 'GET',
@@ -83,10 +91,32 @@ export default function WeightPage() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
+
+    checkAuth();
+    const currentUser = useAuthStore.getState().user;
+    const currentToken = currentUser?.token?.accessToken || currentUser?.accessToken;
+
+    console.log('=== Weight Submit Debug ===');
+    console.log('Store state user:', JSON.stringify(currentUser, null, 2));
+    console.log('user.token object:', currentUser?.token);
+    console.log('user.accessToken (top level):', currentUser?.accessToken);
+    
+    // Check localStorage directly
+    const stored = localStorage.getItem('auth-storage');
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      console.log('localStorage auth-storage:', parsed);
+    }
+
+    if (!currentToken) {
+      setError('로그인이 필요합니다. 현재 토큰: ' + (currentToken || '없음'));
+      setLoading(false);
+      return;
+    }
 
     try {
       const bodyData = { height: formData.height, weight: formData.weight };
@@ -97,17 +127,18 @@ export default function WeightPage() {
         headers: {
           'Content-Type': 'application/json',
           'client-id': 'vitalsense',
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${currentToken}`
         },
         body: JSON.stringify({
           type: 'weight',
           title: `체중 기록 - ${formData.weight}kg`,
           content: `측정 일시: ${formData.date}\n신장: ${formData.height}cm\n체중: ${formData.weight}kg`,
-          extra: { userId: user?._id, userName: user?.name },
+          extra: { userId: currentUser?._id, userName: currentUser?.name },
         }),
       });
 
       const data = await response.json();
+      console.log('Weight save response:', data);
 
       if (data.ok) {
         setSaved(true);
@@ -126,6 +157,7 @@ export default function WeightPage() {
         setError(data.message || '등록에 실패했습니다.');
       }
     } catch (err) {
+      console.error('Weight save error:', err);
       setError('오류가 발생했습니다.');
     } finally {
       setLoading(false);
@@ -140,12 +172,16 @@ export default function WeightPage() {
   const handleDelete = async (item: any) => {
     if (!confirm('이 기록을 삭제하시겠습니까?')) return;
     
+    checkAuth();
+    const currentToken = useAuthStore.getState().user?.token?.accessToken || useAuthStore.getState().user?.accessToken;
+    if (!currentToken) return;
+    
     try {
       const response = await fetch(`${API_URL}?id=${item._id}`, {
         method: 'DELETE',
         headers: {
           'client-id': 'vitalsense',
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${currentToken}`
         },
       });
       const data = await response.json();
@@ -164,13 +200,20 @@ export default function WeightPage() {
     if (!editModal.item) return;
     setLoading(true);
     
+    checkAuth();
+    const currentToken = useAuthStore.getState().user?.token?.accessToken || useAuthStore.getState().user?.accessToken;
+    if (!currentToken) {
+      setLoading(false);
+      return;
+    }
+    
     try {
       const response = await fetch(API_URL, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
           'client-id': 'vitalsense',
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${currentToken}`
         },
         body: JSON.stringify({
           id: editModal.item._id,

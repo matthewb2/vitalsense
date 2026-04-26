@@ -36,11 +36,13 @@ export const useAuthStore = create<AuthState>()(
       },
       logout: () => set({ user: null, isLoggedIn: false }),
       checkAuth: () => {
-        const userStr = localStorage.getItem('user');
-        if (userStr && userStr !== 'undefined' && userStr !== 'null') {
+        const stored = localStorage.getItem('auth-storage');
+        if (stored) {
           try {
-            const user = JSON.parse(userStr);
-            set({ user, isLoggedIn: true });
+            const parsed = JSON.parse(stored);
+            if (parsed.state?.user) {
+              set({ user: parsed.state.user, isLoggedIn: true });
+            }
           } catch {
             set({ user: null, isLoggedIn: false });
           }
