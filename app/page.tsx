@@ -9,7 +9,7 @@ import { useAuthStore } from '@/store/authStore';
 
 export default function HealthDashboard() {
   const router = useRouter();
-  const { isLoggedIn, checkAuth } = useAuthStore();
+  const { user, isLoggedIn, checkAuth } = useAuthStore();
   const [mounted, setMounted] = useState(false);
   const [healthData, setHealthData] = useState({
     bp: { value: '', status: '' },
@@ -31,32 +31,71 @@ export default function HealthDashboard() {
   useEffect(() => {
     const fetchHealthData = async () => {
       try {
-        const [bpRes, sugarRes] = await Promise.all([
-          fetch('/api/posts?type=bp'),
-          fetch('/api/posts?type=blood-sugar'),
+        const currentToken = user?.token?.accessToken || user?.accessToken;
+        if (!currentToken) return;
+
+        const [bpRes, sugarRes, weightRes] = await Promise.all([
+          fetch('/api/posts?type=bp', {
+            headers: { 'Authorization': `Bearer ${currentToken}` }
+          }),
+          fetch('/api/posts?type=blood-sugar', {
+            headers: { 'Authorization': `Bearer ${currentToken}` }
+          }),
+          fetch('/api/posts?type=weight', {
+            headers: { 'Authorization': `Bearer ${currentToken}` }
+          }),
         ]);
 
         const bpData = await bpRes.json();
         const sugarData = await sugarRes.json();
+        const weightData = await weightRes.json();
+
+        const allBpItems = bpData.item || [];
+        const allSugarItems = sugarData.item || [];
+        const allWeightItems = weightData.item || [];
+        
+        // Get most recent items (first item is most recent)
+        const latestBp = allBpItems[0];
+        const latestSugar = allSugarItems[0];
+        const latestWeight = allWeightItems[0];
+
+        // Extract values from title
+        const bpValue = latestBp 
+          ? latestBp.title.replace('혈압 기록 - ', '') 
+          : '기록없음';
+
+        const sugarValue = latestSugar 
+          ? latestSugar.title.split('- ')[1]?.split(' ')[0] || '기록없음' 
+          : '기록없음';
+
+        let bmiValue = '기록없음';
+        if (latestWeight) {
+          const weight = parseFloat(latestWeight.title.replace('체중 기록 - ', '').replace('kg', ''));
+          const storedBodyData = localStorage.getItem('bodyData');
+          if (storedBodyData) {
+            const { height } = JSON.parse(storedBodyData);
+            if (height && weight) {
+              const heightM = parseFloat(height) / 100;
+              const bmi = (weight / (heightM * heightM)).toFixed(1);
+              bmiValue = bmi;
+            }
+          }
+        }
 
         setHealthData({
-          bp: bpData.ok && bpData.items?.length > 0
-            ? { value: bpData.items[0].title.replace('혈압 기록 - ', ''), status: '정상' }
-            : { value: '기록없음', status: '' },
-          sugar: sugarData.ok && sugarData.items?.length > 0
-            ? { value: sugarData.items[0].title.split('- ')[1]?.split(' ')[0] || '기록없음', status: '주의' }
-            : { value: '기록없음', status: '' },
-          bmi: { value: '기록없음', status: '' },
+          bp: { value: bpValue, status: '' },
+          sugar: { value: sugarValue, status: '' },
+          bmi: { value: bmiValue, status: '' },
         });
       } catch (error) {
         console.error('Failed to fetch health data:', error);
       }
     };
 
-    if (isLoggedIn) {
+    if (isLoggedIn && user) {
       fetchHealthData();
     }
-  }, [isLoggedIn]);
+  }, [isLoggedIn, user]);
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 p-4 md:p-8">

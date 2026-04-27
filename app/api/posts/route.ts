@@ -13,11 +13,12 @@ export async function POST(req: NextRequest) {
     debugInfo.stage = 'requesting_backend';
     debugInfo.url = API_URL;
     debugInfo.hasToken = !!token;
+    debugInfo.body = body;
 
-    // 서버 터미널 로그 (서버 확인용)
     console.log('--- [POST] Backend Request ---');
     console.log('Target URL:', API_URL);
     console.log('Authorization:', token ? 'Present' : 'Missing');
+    console.log('Request body:', body);
 
     const response = await fetch(API_URL, {
       method: 'POST',
@@ -32,10 +33,9 @@ export async function POST(req: NextRequest) {
     debugInfo.status = response.status;
     const data = await response.json();
 
-    // 브라우저로 보낼 응답에 디버깅 정보를 포함 (개발 중에만 유용)
     return NextResponse.json({
       ...data,
-      _debug: debugInfo // 브라우저 콘솔에서 확인할 수 있게 추가
+      _debug: debugInfo
     });
 
   } catch (error: any) {

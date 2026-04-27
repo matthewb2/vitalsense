@@ -4,13 +4,12 @@ import React, { useState, useEffect } from 'react';
 import Header from '../components/Header';
 import { Activity, Calendar, Save, List, Plus, Ruler, Edit2, Trash2, X } from 'lucide-react';
 import Link from 'next/link';
-
 import { useAuthStore } from '@/store/authStore';
 
 const API_URL = '/api/posts';
 
 export default function WeightPage() {
-  const { user, isLoggedIn, checkAuth } = useAuthStore();
+  const { user, checkAuth } = useAuthStore();
   const [activeTab, setActiveTab] = useState<'record' | 'list'>('list');
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -58,7 +57,7 @@ export default function WeightPage() {
 
   const fetchHistory = async (token?: string) => {
     if (!token) return;
-    
+
     try {
       const response = await fetch(`${API_URL}?type=weight`, {
         method: 'GET',
@@ -68,22 +67,26 @@ export default function WeightPage() {
         },
       });
       const data = await response.json();
-      
+
       if (data.ok && data.item) {
         const userId = user?._id;
         const filtered = data.item.filter((item: any) => item.user?._id === userId);
-        
+
         const parsed = filtered.map((item: any) => {
           const contentMatch = item.content.match(/체중: ([\d.]+)kg/);
           const heightMatch = item.content.match(/신장: ([\d.]+)cm/);
+          const weight = contentMatch ? parseFloat(contentMatch[1]) : 0;
+          const height = heightMatch ? parseFloat(heightMatch[1]) : 0;
+          const bmi = height > 0 && weight > 0 ? (weight / ((height / 100) ** 2)).toFixed(1) : '';
           return {
             _id: item._id,
             date: item.content.split('측정 일시: ')[1]?.split('\n')[0] || '',
             height: heightMatch ? heightMatch[1] : '',
             weight: contentMatch ? contentMatch[1] : '',
+            bmi: bmi,
           };
         });
-        
+
         setHistory(parsed);
       }
     } catch (err) {
@@ -91,7 +94,7 @@ export default function WeightPage() {
     }
   };
 
-const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
@@ -100,20 +103,8 @@ const handleSubmit = async (e: React.FormEvent) => {
     const currentUser = useAuthStore.getState().user;
     const currentToken = currentUser?.token?.accessToken || currentUser?.accessToken;
 
-    console.log('=== Weight Submit Debug ===');
-    console.log('Store state user:', JSON.stringify(currentUser, null, 2));
-    console.log('user.token object:', currentUser?.token);
-    console.log('user.accessToken (top level):', currentUser?.accessToken);
-    
-    // Check localStorage directly
-    const stored = localStorage.getItem('auth-storage');
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      console.log('localStorage auth-storage:', parsed);
-    }
-
     if (!currentToken) {
-      setError('로그인이 필요합니다. 현재 토큰: ' + (currentToken || '없음'));
+      setError('로그인이 필요합니다.');
       setLoading(false);
       return;
     }
@@ -121,7 +112,7 @@ const handleSubmit = async (e: React.FormEvent) => {
     try {
       const bodyData = { height: formData.height, weight: formData.weight };
       localStorage.setItem('bodyData', JSON.stringify(bodyData));
-      
+
       const response = await fetch(API_URL, {
         method: 'POST',
         headers: {
@@ -133,12 +124,11 @@ const handleSubmit = async (e: React.FormEvent) => {
           type: 'weight',
           title: `체중 기록 - ${formData.weight}kg`,
           content: `측정 일시: ${formData.date}\n신장: ${formData.height}cm\n체중: ${formData.weight}kg`,
-          extra: { userId: currentUser?._id, userName: currentUser?.name },
+          extra: { userId: user?._id, userName: user?.name },
         }),
       });
 
       const data = await response.json();
-      console.log('Weight save response:', data);
 
       if (data.ok) {
         setSaved(true);
@@ -157,7 +147,6 @@ const handleSubmit = async (e: React.FormEvent) => {
         setError(data.message || '등록에 실패했습니다.');
       }
     } catch (err) {
-      console.error('Weight save error:', err);
       setError('오류가 발생했습니다.');
     } finally {
       setLoading(false);
@@ -171,11 +160,10 @@ const handleSubmit = async (e: React.FormEvent) => {
 
   const handleDelete = async (item: any) => {
     if (!confirm('이 기록을 삭제하시겠습니까?')) return;
-    
-    checkAuth();
-    const currentToken = useAuthStore.getState().user?.token?.accessToken || useAuthStore.getState().user?.accessToken;
+
+    const currentToken = user?.token?.accessToken || user?.accessToken;
     if (!currentToken) return;
-    
+
     try {
       const response = await fetch(`${API_URL}?id=${item._id}`, {
         method: 'DELETE',
@@ -185,7 +173,7 @@ const handleSubmit = async (e: React.FormEvent) => {
         },
       });
       const data = await response.json();
-      
+
       if (data.ok) {
         setHistory(history.filter(h => h._id !== item._id));
       } else {
@@ -199,14 +187,13 @@ const handleSubmit = async (e: React.FormEvent) => {
   const handleUpdate = async () => {
     if (!editModal.item) return;
     setLoading(true);
-    
-    checkAuth();
-    const currentToken = useAuthStore.getState().user?.token?.accessToken || useAuthStore.getState().user?.accessToken;
+
+    const currentToken = user?.token?.accessToken || user?.accessToken;
     if (!currentToken) {
       setLoading(false);
       return;
     }
-    
+
     try {
       const response = await fetch(API_URL, {
         method: 'PATCH',
@@ -221,12 +208,12 @@ const handleSubmit = async (e: React.FormEvent) => {
           content: `측정 일시: ${editModal.item.date}\n신장: ${editForm.height}cm\n체중: ${editForm.weight}kg`,
         }),
       });
-      
+
       const data = await response.json();
-      
+
       if (data.ok) {
-        setHistory(history.map(h => 
-          h._id === editModal.item._id 
+        setHistory(history.map(h =>
+          h._id === editModal.item._id
             ? { ...h, height: editForm.height, weight: editForm.weight }
             : h
         ));
@@ -235,7 +222,7 @@ const handleSubmit = async (e: React.FormEvent) => {
         setError(data.message || '수정에 실패했습니다.');
       }
     } catch (err) {
-      setError('오류가 발생했습니다.');
+      setError('오류가 발생합니다.');
     } finally {
       setLoading(false);
     }
@@ -247,17 +234,17 @@ const handleSubmit = async (e: React.FormEvent) => {
 
       <main className="max-w-4xl mx-auto mt-6">
         <div className="flex bg-white p-1.5 rounded-2xl shadow-sm mb-8 w-fit mx-auto border border-slate-200">
-          <TabButton 
-            active={activeTab === 'list'} 
-            onClick={() => setActiveTab('list')} 
-            icon={<List size={18} />} 
-            label="기록 목록" 
+          <TabButton
+            active={activeTab === 'list'}
+            onClick={() => setActiveTab('list')}
+            icon={<List size={18} />}
+            label="기록 목록"
           />
-          <TabButton 
-            active={activeTab === 'record'} 
-            onClick={() => setActiveTab('record')} 
-            icon={<Plus size={18} />} 
-            label="수치 기록" 
+          <TabButton
+            active={activeTab === 'record'}
+            onClick={() => setActiveTab('record')}
+            icon={<Plus size={18} />}
+            label="수치 기록"
           />
         </div>
 
@@ -276,8 +263,8 @@ const handleSubmit = async (e: React.FormEvent) => {
                   <thead className="bg-slate-50 text-slate-500 font-medium">
                     <tr>
                       <th className="p-4">날짜</th>
-                      <th className="p-4">신장</th>
                       <th className="p-4">체중</th>
+                      <th className="p-4">BMI</th>
                       <th className="p-4">관리</th>
                     </tr>
                   </thead>
@@ -285,8 +272,8 @@ const handleSubmit = async (e: React.FormEvent) => {
                     {history.map((item, i) => (
                       <tr key={i} className="hover:bg-slate-50/50 transition">
                         <td className="p-4 font-medium">{item.date}</td>
-                        <td className="p-4 text-slate-600">{item.height} cm</td>
                         <td className="p-4 text-green-600 font-bold">{item.weight} kg</td>
+                        <td className="p-4 text-purple-600 font-bold">{item.bmi}</td>
                         <td className="p-4">
                           <div className="flex gap-2">
                             <button
@@ -320,8 +307,8 @@ const handleSubmit = async (e: React.FormEvent) => {
                 <label className="text-sm font-bold text-slate-600 flex items-center gap-1">
                   <Calendar size={14} /> 측정 날짜
                 </label>
-                <input 
-                  type="date" 
+                <input
+                  type="date"
                   className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-green-500"
                   value={formData.date}
                   onChange={(e) => setFormData({...formData, date: e.target.value})}
@@ -332,8 +319,8 @@ const handleSubmit = async (e: React.FormEvent) => {
                   <Ruler size={14} /> 신장
                 </label>
                 <div className="relative">
-                  <input 
-                    type="number" 
+                  <input
+                    type="number"
                     placeholder="170"
                     step="0.1"
                     className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 font-mono text-lg"
@@ -346,8 +333,8 @@ const handleSubmit = async (e: React.FormEvent) => {
               <div className="space-y-2">
                 <label className="text-sm font-bold text-slate-600">체중</label>
                 <div className="relative">
-                  <input 
-                    type="number" 
+                  <input
+                    type="number"
                     placeholder="70.0"
                     step="0.1"
                     className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 font-mono text-lg"
@@ -357,12 +344,12 @@ const handleSubmit = async (e: React.FormEvent) => {
                   <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-bold">kg</span>
                 </div>
               </div>
-              
+
               {error && (
                 <p className="text-red-500 text-sm text-center">{error}</p>
               )}
-              
-              <button 
+
+              <button
                 type="submit"
                 disabled={loading}
                 className="w-full py-4 bg-green-500 text-white rounded-2xl font-bold hover:bg-green-600 transition shadow-lg shadow-green-100 disabled:opacity-50"
@@ -377,9 +364,9 @@ const handleSubmit = async (e: React.FormEvent) => {
           </div>
         )}
       </main>
-      
-      <EditModal 
-        open={editModal.open} 
+
+      <EditModal
+        open={editModal.open}
         item={editModal.item}
         form={editForm}
         setForm={setEditForm}
@@ -393,7 +380,7 @@ const handleSubmit = async (e: React.FormEvent) => {
 
 function TabButton({ active, onClick, icon, label }: { active: boolean; onClick: () => void; icon: React.ReactNode; label: string }) {
   return (
-    <button 
+    <button
       onClick={onClick}
       className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${
         active ? 'bg-green-500 text-white shadow-md' : 'text-slate-500 hover:text-slate-800'
@@ -406,7 +393,7 @@ function TabButton({ active, onClick, icon, label }: { active: boolean; onClick:
 
 function EditModal({ open, item, form, setForm, onClose, onSave, loading }: any) {
   if (!open) return null;
-  
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <div className="bg-white rounded-2xl p-6 w-full max-w-md mx-4">
@@ -416,22 +403,12 @@ function EditModal({ open, item, form, setForm, onClose, onSave, loading }: any)
             <X size={20} />
           </button>
         </div>
-        
+
         <div className="space-y-4">
           <div className="space-y-2">
-            <label className="text-sm font-bold text-slate-600">신장 (cm)</label>
-            <input 
-              type="number" 
-              step="0.1"
-              className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 font-mono"
-              value={form.height}
-              onChange={(e: any) => setForm({...form, height: e.target.value})}
-            />
-          </div>
-          <div className="space-y-2">
             <label className="text-sm font-bold text-slate-600">체중 (kg)</label>
-            <input 
-              type="number" 
+            <input
+              type="number"
               step="0.1"
               className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 font-mono"
               value={form.weight}
@@ -439,7 +416,7 @@ function EditModal({ open, item, form, setForm, onClose, onSave, loading }: any)
             />
           </div>
         </div>
-        
+
         <div className="flex gap-3 mt-6">
           <button
             onClick={onClose}
