@@ -189,23 +189,22 @@ function HealthCard({ title, value, unit, icon, status, color = "text-green-500"
   if (loading) {
     return (
       <div className={`bg-white p-3 sm:p-4 rounded-2xl shadow-sm border border-slate-100 h-full animate-pulse ${className}`}>
-        <div className="flex justify-between items-start mb-2">
+        <div className="flex items-center gap-2 mb-2">
           <div className="p-1.5 sm:p-2 bg-slate-100 rounded-lg w-8 h-8"></div>
+          <div className="h-4 bg-slate-100 rounded w-12"></div>
         </div>
-        <div className="h-6 sm:h-8 bg-slate-100 rounded w-20 mb-2"></div>
-        <div className="h-3 bg-slate-100 rounded w-12"></div>
+        <div className="h-6 sm:h-8 bg-slate-100 rounded w-20"></div>
       </div>
     );
   }
 
   const CardContent = (
     <div className={`bg-white p-3 sm:p-4 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition cursor-pointer h-full ${className}`}>
-      <div className="flex justify-between items-start mb-2">
+      <div className="flex items-center gap-2 mb-2">
         <div className="p-1.5 sm:p-2 bg-slate-50 rounded-lg">{icon}</div>
-        <span className={`text-[10px] sm:text-xs font-bold ${color}`}>{status}</span>
+        <span className="text-xs sm:text-sm text-slate-500 font-medium">{title}</span>
       </div>
       <div className="text-lg sm:text-2xl font-bold">{value}</div>
-      <div className="text-xs text-slate-400">{title}</div>
     </div>
   );
 
