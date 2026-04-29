@@ -103,6 +103,10 @@ export default function WeightPage() {
     const currentUser = useAuthStore.getState().user;
     const currentToken = currentUser?.token?.accessToken || currentUser?.accessToken;
 
+    console.log('Current user from store:', currentUser);
+    console.log('Token from store:', currentToken);
+    console.log('LocalStorage auth-storage:', localStorage.getItem('auth-storage'));
+
     if (!currentToken) {
       setError('로그인이 필요합니다.');
       setLoading(false);
