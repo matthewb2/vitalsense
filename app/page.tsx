@@ -65,7 +65,7 @@ export default function HealthDashboard() {
           ? latestBp.title.replace('혈압 기록 - ', '') 
           : '기록없음';
 
-        const sugarValue = latestSugar 
+        const sugarValue = latestSugar && latestSugar.title
           ? latestSugar.title.split('- ')[1]?.split(' ')[0] || '기록없음' 
           : '기록없음';
 
