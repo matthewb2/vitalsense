@@ -75,11 +75,15 @@ export default function WeightPage() {
         const parsed = filtered.map((item: any) => {
           const contentMatch = item.content.match(/체중: ([\d.]+)kg/);
           const heightMatch = item.content.match(/신장: ([\d.]+)cm/);
+          const weight = contentMatch ? parseFloat(contentMatch[1]) : 0;
+          const height = heightMatch ? parseFloat(heightMatch[1]) : 0;
+          const bmi = height > 0 && weight > 0 ? (weight / ((height / 100) ** 2)).toFixed(1) : '';
           return {
             _id: item._id,
             date: item.content.split('측정 일시: ')[1]?.split('\n')[0] || '',
             height: heightMatch ? heightMatch[1] : '',
             weight: contentMatch ? contentMatch[1] : '',
+            bmi: bmi,
           };
         });
 
@@ -98,6 +102,10 @@ export default function WeightPage() {
     checkAuth();
     const currentUser = useAuthStore.getState().user;
     const currentToken = currentUser?.token?.accessToken || currentUser?.accessToken;
+
+    console.log('Current user from store:', currentUser);
+    console.log('Token from store:', currentToken);
+    console.log('LocalStorage auth-storage:', localStorage.getItem('auth-storage'));
 
     if (!currentToken) {
       setError('로그인이 필요합니다.');
@@ -259,8 +267,8 @@ export default function WeightPage() {
                   <thead className="bg-slate-50 text-slate-500 font-medium">
                     <tr>
                       <th className="p-4">날짜</th>
-                      <th className="p-4">신장</th>
                       <th className="p-4">체중</th>
+                      <th className="p-4">BMI</th>
                       <th className="p-4">관리</th>
                     </tr>
                   </thead>
@@ -268,8 +276,8 @@ export default function WeightPage() {
                     {history.map((item, i) => (
                       <tr key={i} className="hover:bg-slate-50/50 transition">
                         <td className="p-4 font-medium">{item.date}</td>
-                        <td className="p-4 text-slate-600">{item.height} cm</td>
                         <td className="p-4 text-green-600 font-bold">{item.weight} kg</td>
+                        <td className="p-4 text-purple-600 font-bold">{item.bmi}</td>
                         <td className="p-4">
                           <div className="flex gap-2">
                             <button
@@ -401,16 +409,6 @@ function EditModal({ open, item, form, setForm, onClose, onSave, loading }: any)
         </div>
 
         <div className="space-y-4">
-          <div className="space-y-2">
-            <label className="text-sm font-bold text-slate-600">신장 (cm)</label>
-            <input
-              type="number"
-              step="0.1"
-              className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 font-mono"
-              value={form.height}
-              onChange={(e: any) => setForm({...form, height: e.target.value})}
-            />
-          </div>
           <div className="space-y-2">
             <label className="text-sm font-bold text-slate-600">체중 (kg)</label>
             <input

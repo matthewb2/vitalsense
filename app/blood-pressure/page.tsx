@@ -66,20 +66,36 @@ const formatTime = (dateTime: string) => {
             const contentMatch = item.content.match(/수축기 혈압: (\d+)mmHg\n확장기 혈압: (\d+)mmHg/);
             const dateTimeMatch = item.content.match(/측정 일시: (.+)/);
             const fullDateTime = dateTimeMatch ? dateTimeMatch[1] : '';
-            console.log('Parsed datetime raw:', fullDateTime);
             
-            // Split by newline first to get clean date and time
-            const lines = fullDateTime.split('\n');
-            const dateTimeLine = lines[0] || '';
-            const dateTimeParts = dateTimeLine.split(' ');
-            const dateOnly = dateTimeParts[0] || dateTimeLine;
-            const timeOnly = dateTimeParts[1] || '';
+            // Extract date and time - handle various formats
+            let dateOnly = '';
+            let timeOnly = '';
+            
+            if (fullDateTime) {
+              // Try to split by space or newline
+              const parts = fullDateTime.split(/[\s\n]+/);
+              dateOnly = parts[0] || '';
+              timeOnly = parts[1] || '';
+            }
+            
+            // Format time if available
+            let formattedTime = '';
+            if (timeOnly) {
+              const timeMatch = timeOnly.match(/(\d+):(\d+)/);
+              if (timeMatch) {
+                const hour = parseInt(timeMatch[1]);
+                const minute = timeMatch[2];
+                const ampm = hour >= 12 ? '오후' : '오전';
+                const hour12 = hour % 12 || 12;
+                formattedTime = `${ampm} ${hour12}:${minute}`;
+              }
+            }
             
             return {
               _id: item._id,
               date: dateOnly,
               time: timeOnly,
-              formattedTime: fullDateTime ? formatTime(dateTimeLine) : '',
+              formattedTime: formattedTime,
               systolic: contentMatch ? contentMatch[1] : '',
               diastolic: contentMatch ? contentMatch[2] : '',
             };
