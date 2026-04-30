@@ -5,6 +5,7 @@ import Header from '../components/Header';
 import { Heart, Calendar, Save, List, Plus, Edit2, Trash2, X } from 'lucide-react';
 import Link from 'next/link';
 import { useAuthStore } from '@/store/authStore';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 const API_URL = '/api/posts';
 
@@ -257,55 +258,78 @@ try {
         </div>
 
         {activeTab === 'list' ? (
-          <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
-            <div className="p-5 border-b border-slate-50 flex justify-between items-center">
-              <h3 className="font-bold flex items-center gap-2"><Heart size={18} className="text-red-500" /> 혈압 기록</h3>
-            </div>
-            {fetching ? (
-              <div className="p-8 text-center text-slate-400"> loading...</div>
-            ) : history.length === 0 ? (
-              <div className="p-8 text-center text-slate-400">
-                기록된 혈압 데이터가 없습니다.
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead className="bg-slate-50 text-slate-500 font-medium">
-                    <tr>
-                      <th className="p-4">날짜/시간</th>
-                      <th className="p-4">수축기</th>
-                      <th className="p-4">이완기</th>
-                      <th className="p-4">관리</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50">
-                    {history.map((item, i) => (
-                      <tr key={i} className="hover:bg-slate-50/50 transition">
-                        <td className="p-4 font-medium">{item.date} {item.formattedTime}</td>
-                        <td className="p-4 text-blue-600 font-bold">{item.systolic}</td>
-                        <td className="p-4 text-emerald-600 font-bold">{item.diastolic}</td>
-                        <td className="p-4">
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => handleEdit(item)}
-                              className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition"
-                            >
-                              <Edit2 size={16} />
-                            </button>
-                            <button
-                              onClick={() => handleDelete(item)}
-                              className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+          <div className="space-y-4">
+            {history.length > 0 && (
+              <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-4">
+                <h3 className="font-bold flex items-center gap-2 mb-4"><Heart size={18} className="text-red-500" /> 혈압 추이</h3>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={[...history].reverse()} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                      <XAxis dataKey="date" tick={{ fontSize: 12 }} stroke="#94a3b8" />
+                      <YAxis domain={['auto', 'auto']} tick={{ fontSize: 12 }} stroke="#94a3b8" />
+                      <Tooltip 
+                        contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0' }}
+                      />
+                      <Legend />
+                      <Line type="monotone" dataKey="systolic" name="수축기" stroke="#3b82f6" strokeWidth={2} dot={{ r: 4 }} />
+                      <Line type="monotone" dataKey="diastolic" name="이완기" stroke="#10b981" strokeWidth={2} dot={{ r: 4 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
             )}
+            
+            <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+              <div className="p-5 border-b border-slate-50 flex justify-between items-center">
+                <h3 className="font-bold flex items-center gap-2"><Heart size={18} className="text-red-500" /> 혈압 기록</h3>
+              </div>
+              {fetching ? (
+                <div className="p-8 text-center text-slate-400"> loading...</div>
+              ) : history.length === 0 ? (
+                <div className="p-8 text-center text-slate-400">
+                  기록된 혈압 데이터가 없습니다.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-slate-50 text-slate-500 font-medium">
+                      <tr>
+                        <th className="p-4">날짜/시간</th>
+                        <th className="p-4">수축기</th>
+                        <th className="p-4">이완기</th>
+                        <th className="p-4">관리</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {history.map((item, i) => (
+                        <tr key={i} className="hover:bg-slate-50/50 transition">
+                          <td className="p-4 font-medium">{item.date} {item.formattedTime}</td>
+                          <td className="p-4 text-blue-600 font-bold">{item.systolic}</td>
+                          <td className="p-4 text-emerald-600 font-bold">{item.diastolic}</td>
+                          <td className="p-4">
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => handleEdit(item)}
+                                className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition"
+                              >
+                                <Edit2 size={16} />
+                              </button>
+                              <button
+                                onClick={() => handleDelete(item)}
+                                className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
           </div>
         ) : (
           <div className="bg-white rounded-3xl shadow-xl border border-slate-100 max-w-lg mx-auto overflow-hidden">

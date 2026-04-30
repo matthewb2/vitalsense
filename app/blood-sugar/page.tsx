@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Header from '../components/Header';
 import { Droplets, Calendar, Save, List, Plus } from 'lucide-react';
 import Link from 'next/link';
-
 import { useAuthStore } from '@/store/authStore';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 const API_URL = '/api/posts';
 
@@ -17,12 +17,60 @@ export default function BloodSugarPage() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
   const [history, setHistory] = useState<any[]>([]);
+  const [fetching, setFetching] = useState(false);
 
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
     sugar: '',
     time: '공복',
   });
+
+  useEffect(() => {
+    if (user?._id && token) {
+      fetchHistory();
+    }
+  }, [user?._id, token]);
+
+  const fetchHistory = async () => {
+    setFetching(true);
+    try {
+      const response = await fetch(`${API_URL}?type=blood-sugar`, {
+        method: 'GET',
+        headers: {
+          'client-id': 'vitalsense',
+          'Authorization': `Bearer ${token}`
+        },
+      });
+      const data = await response.json();
+      console.log('Blood sugar history response:', data);
+      
+      if (data.ok && data.item) {
+        const userId = user?._id;
+        const filtered = data.item.filter((item: any) => item.user?._id === userId);
+        console.log('Filtered items:', filtered);
+        
+        const parsed = filtered.map((item: any) => {
+          const contentMatch = item.content.match(/혈당: (\d+)mg\/dL/);
+          const dateTimeMatch = item.content.match(/측정 일시: (.+)/);
+          const timeMatch = item.content.match(/측정 시간: (.+)/);
+          
+          return {
+            _id: item._id,
+            date: dateTimeMatch ? dateTimeMatch[1].split('\n')[0] : '',
+            sugar: contentMatch ? contentMatch[1] : '',
+            time: timeMatch ? timeMatch[1] : '',
+          };
+        });
+        
+        console.log('Parsed history:', parsed);
+        setHistory(parsed);
+      }
+    } catch (err) {
+      console.error('Error fetching history:', err);
+    } finally {
+      setFetching(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -100,36 +148,58 @@ export default function BloodSugarPage() {
         </div>
 
         {activeTab === 'list' ? (
-          <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
-            <div className="p-5 border-b border-slate-50 flex justify-between items-center">
-              <h3 className="font-bold flex items-center gap-2"><Droplets size={18} className="text-blue-500" /> 혈당 기록</h3>
-            </div>
-            {history.length === 0 ? (
-              <div className="p-8 text-center text-slate-400">
-                기록된 혈당 데이터가 없습니다.
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead className="bg-slate-50 text-slate-500 font-medium">
-                    <tr>
-                      <th className="p-4">날짜</th>
-                      <th className="p-4">혈당</th>
-                      <th className="p-4">측정 시간</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50">
-                    {history.map((item, i) => (
-                      <tr key={i} className="hover:bg-slate-50/50 transition">
-                        <td className="p-4 font-medium">{item.date}</td>
-                        <td className="p-4 text-blue-600 font-bold">{item.sugar} mg/dL</td>
-                        <td className="p-4 text-slate-600">{item.time}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+          <div className="space-y-4">
+            {history.length > 0 && (
+              <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-4">
+                <h3 className="font-bold flex items-center gap-2 mb-4"><Droplets size={18} className="text-blue-500" /> 혈당 추이</h3>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={[...history].reverse()} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                      <XAxis dataKey="date" tick={{ fontSize: 12 }} stroke="#94a3b8" />
+                      <YAxis domain={['auto', 'auto']} tick={{ fontSize: 12 }} stroke="#94a3b8" />
+                      <Tooltip contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0' }} />
+                      <Legend />
+                      <Line type="monotone" dataKey="sugar" name="혈당" stroke="#3b82f6" strokeWidth={2} dot={{ r: 4 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
             )}
+            
+            <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+              <div className="p-5 border-b border-slate-50 flex justify-between items-center">
+                <h3 className="font-bold flex items-center gap-2"><Droplets size={18} className="text-blue-500" /> 혈당 기록</h3>
+              </div>
+              {fetching ? (
+                <div className="p-8 text-center text-slate-400"> loading...</div>
+              ) : history.length === 0 ? (
+                <div className="p-8 text-center text-slate-400">
+                  기록된 혈당 데이터가 없습니다.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-slate-50 text-slate-500 font-medium">
+                      <tr>
+                        <th className="p-4">날짜</th>
+                        <th className="p-4">혈당</th>
+                        <th className="p-4">측정 시간</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {history.map((item, i) => (
+                        <tr key={i} className="hover:bg-slate-50/50 transition">
+                          <td className="p-4 font-medium">{item.date}</td>
+                          <td className="p-4 text-blue-600 font-bold">{item.sugar} mg/dL</td>
+                          <td className="p-4 text-slate-600">{item.time}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
           </div>
         ) : (
           <div className="bg-white rounded-3xl shadow-xl border border-slate-100 max-w-lg mx-auto overflow-hidden">

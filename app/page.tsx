@@ -11,6 +11,7 @@ export default function HealthDashboard() {
   const router = useRouter();
   const { user, isLoggedIn, checkAuth } = useAuthStore();
   const [mounted, setMounted] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [healthData, setHealthData] = useState({
     bp: { value: '', status: '' },
     sugar: { value: '', status: '' },
@@ -64,8 +65,8 @@ export default function HealthDashboard() {
           ? latestBp.title.replace('혈압 기록 - ', '') 
           : '기록없음';
 
-        const sugarValue = latestSugar 
-          ? latestSugar.title.split('- ')[1]?.split(' ')[0] || '기록없음' 
+        const sugarValue = latestSugar && latestSugar.title
+          ? latestSugar.title.split('- ')[1]?.split('m')[0] || '기록없음' 
           : '기록없음';
 
         let bmiValue = '기록없음';
@@ -87,8 +88,10 @@ export default function HealthDashboard() {
           sugar: { value: sugarValue, status: '' },
           bmi: { value: bmiValue, status: '' },
         });
+        setLoading(false);
       } catch (error) {
         console.error('Failed to fetch health data:', error);
+        setLoading(false);
       }
     };
 
@@ -113,6 +116,7 @@ export default function HealthDashboard() {
               icon={<Heart className="text-red-500 w-4 h-4 sm:w-5 sm:h-5" />} 
               status={healthData.bp.status || ''} 
               href="/blood-pressure"
+              loading={loading}
             />
             <HealthCard 
               title="혈당" 
@@ -122,6 +126,7 @@ export default function HealthDashboard() {
               status={healthData.sugar.status || ''} 
               color="text-orange-500"
               href="/blood-sugar"
+              loading={loading}
             />
             <HealthCard 
               title="BMI" 
@@ -130,6 +135,7 @@ export default function HealthDashboard() {
               icon={<Activity className="text-purple-500 w-4 h-4 sm:w-5 sm:h-5" />} 
               status={healthData.bmi.status || ''}
               href="/weight"
+              loading={loading}
             />
           </div>
 
@@ -179,15 +185,32 @@ export default function HealthDashboard() {
 }
 
 // 수정된 HealthCard 컴포넌트
-function HealthCard({ title, value, unit, icon, status, color = "text-green-500", href, className = "" }: any) {
+function HealthCard({ title, value, unit, icon, status, color = "text-green-500", href, className = "", loading = false }: any) {
+if (loading) {
+    return (
+      <div className={`bg-white p-3 sm:p-4 rounded-2xl shadow-sm border border-slate-100 h-full animate-pulse ${className}`}>
+        <div className="flex items-center gap-2 mb-1">
+          <div className="p-1.5 sm:p-2 bg-slate-100 rounded-lg w-8 h-8"></div>
+          <div className="h-4 bg-slate-100 rounded w-12"></div>
+        </div>
+        <div className="flex items-baseline gap-1">
+          <div className="h-6 sm:h-8 bg-slate-100 rounded w-20"></div>
+          <div className="h-3 bg-slate-100 rounded w-8"></div>
+        </div>
+      </div>
+    );
+  }
+
   const CardContent = (
     <div className={`bg-white p-3 sm:p-4 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition cursor-pointer h-full ${className}`}>
-      <div className="flex justify-between items-start mb-2">
+      <div className="flex items-center gap-2 mb-1">
         <div className="p-1.5 sm:p-2 bg-slate-50 rounded-lg">{icon}</div>
-        <span className={`text-[10px] sm:text-xs font-bold ${color}`}>{status}</span>
+        <span className="text-xs sm:text-sm text-slate-500 font-medium">{title}</span>
       </div>
-      <div className="text-lg sm:text-2xl font-bold">{value}</div>
-      <div className="text-xs text-slate-400">{title}</div>
+      <div className="flex items-baseline gap-1">
+        <span className="text-lg sm:text-xl">{value}</span>
+        {unit && <span className="text-xs text-slate-400">{unit}</span>}
+      </div>
     </div>
   );
 

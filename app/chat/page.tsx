@@ -71,13 +71,13 @@ function ChatContent() {
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
         {messages.map((msg, i) => (
           <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-[85%] p-4 rounded-2xl text-base whitespace-pre-wrap ${
+            <div className={`max-w-[85%] p-4 rounded-2xl text-lg whitespace-pre-wrap ${
               msg.role === 'user' 
                 ? 'bg-blue-600 text-white' 
                 : 'bg-slate-100 text-slate-800'
             }`}>
               {msg.role === 'user' ? msg.content : (
-                <div className="prose prose-sm max-w-none">
+                <div className="prose prose-lg max-w-none">
                   <ReactMarkdown>{msg.content}</ReactMarkdown>
                 </div>
               )}
@@ -103,7 +103,7 @@ function ChatContent() {
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
             placeholder="건강에 대해 질문하세요..."
-            className="flex-1 p-4 bg-slate-100 border-0 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
+            className="flex-1 p-4 bg-slate-100 border-0 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-lg"
             disabled={loading}
           />
           <button 
