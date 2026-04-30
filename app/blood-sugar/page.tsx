@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Header from '../components/Header';
 import { Droplets, Calendar, Save, List, Plus } from 'lucide-react';
 import Link from 'next/link';
@@ -17,12 +17,60 @@ export default function BloodSugarPage() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
   const [history, setHistory] = useState<any[]>([]);
+  const [fetching, setFetching] = useState(false);
 
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
     sugar: '',
     time: '공복',
   });
+
+  useEffect(() => {
+    if (user?._id && token) {
+      fetchHistory();
+    }
+  }, [user?._id, token]);
+
+  const fetchHistory = async () => {
+    setFetching(true);
+    try {
+      const response = await fetch(`${API_URL}?type=blood-sugar`, {
+        method: 'GET',
+        headers: {
+          'client-id': 'vitalsense',
+          'Authorization': `Bearer ${token}`
+        },
+      });
+      const data = await response.json();
+      console.log('Blood sugar history response:', data);
+      
+      if (data.ok && data.item) {
+        const userId = user?._id;
+        const filtered = data.item.filter((item: any) => item.user?._id === userId);
+        console.log('Filtered items:', filtered);
+        
+        const parsed = filtered.map((item: any) => {
+          const contentMatch = item.content.match(/혈당: (\d+)mg\/dL/);
+          const dateTimeMatch = item.content.match(/측정 일시: (.+)/);
+          const timeMatch = item.content.match(/측정 시간: (.+)/);
+          
+          return {
+            _id: item._id,
+            date: dateTimeMatch ? dateTimeMatch[1].split('\n')[0] : '',
+            sugar: contentMatch ? contentMatch[1] : '',
+            time: timeMatch ? timeMatch[1] : '',
+          };
+        });
+        
+        console.log('Parsed history:', parsed);
+        setHistory(parsed);
+      }
+    } catch (err) {
+      console.error('Error fetching history:', err);
+    } finally {
+      setFetching(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -104,7 +152,9 @@ export default function BloodSugarPage() {
             <div className="p-5 border-b border-slate-50 flex justify-between items-center">
               <h3 className="font-bold flex items-center gap-2"><Droplets size={18} className="text-blue-500" /> 혈당 기록</h3>
             </div>
-            {history.length === 0 ? (
+            {fetching ? (
+              <div className="p-8 text-center text-slate-400"> loading...</div>
+            ) : history.length === 0 ? (
               <div className="p-8 text-center text-slate-400">
                 기록된 혈당 데이터가 없습니다.
               </div>
