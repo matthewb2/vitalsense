@@ -65,8 +65,8 @@ export default function HealthDashboard() {
           ? latestBp.title.replace('혈압 기록 - ', '') 
           : '기록없음';
 
-        const sugarValue = latestSugar 
-          ? latestSugar.title.replace('혈당 기록 - ', '') 
+        const sugarValue = latestSugar && latestSugar.title
+          ? latestSugar.title.split('- ')[1]?.split('m')[0] || '기록없음' 
           : '기록없음';
 
         let bmiValue = '기록없음';
@@ -208,7 +208,7 @@ if (loading) {
         <span className="text-xs sm:text-sm text-slate-500 font-medium">{title}</span>
       </div>
       <div className="flex items-baseline gap-1">
-        <span className="text-lg sm:text-2xl font-bold">{value}</span>
+        <span className="text-lg sm:text-xl">{value}</span>
         {unit && <span className="text-xs text-slate-400">{unit}</span>}
       </div>
     </div>
