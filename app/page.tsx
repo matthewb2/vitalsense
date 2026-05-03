@@ -29,59 +29,91 @@ export default function HealthDashboard() {
     }
   }, [mounted, isLoggedIn, router]);
 
-  useEffect(() => {
+useEffect(() => {
     const fetchHealthData = async () => {
       try {
         const currentToken = user?.token?.accessToken || user?.accessToken;
-        if (!currentToken) return;
+        const userId = user?._id || user?.extra?.userId;
+        console.log('[DEBUG] user:', user);
+        console.log('[DEBUG] userId:', userId);
+        if (!currentToken || !userId) return;
 
-        const [bpRes, sugarRes, weightRes] = await Promise.all([
-          fetch('/api/posts?type=bp', {
+        const healthDataKey = `healthData_${userId}`;
+        const storedHealthData = localStorage.getItem(healthDataKey);
+        if (storedHealthData) {
+          const parsed = JSON.parse(storedHealthData);
+          console.log('[DEBUG] Loaded from localStorage:', parsed);
+          setHealthData({
+            bp: { value: parsed.bp || '기록없음', status: '' },
+            sugar: { value: parsed.sugar || '기록없음', status: '' },
+            bmi: { value: parsed.bmi || '기록없음', status: '' },
+          });
+        }
+
+        console.log('[DEBUG]Fetching health data...');
+
+        const [bpRes, sugarRes, bmiRes] = await Promise.all([
+          fetch('/api/posts/users?type=bp&limit=100', {
             headers: { 'Authorization': `Bearer ${currentToken}` }
           }),
-          fetch('/api/posts?type=blood-sugar', {
+          fetch('/api/posts/users?type=blood-sugar&limit=100', {
             headers: { 'Authorization': `Bearer ${currentToken}` }
           }),
-          fetch('/api/posts?type=weight', {
+          fetch('/api/posts/users?type=bmi&limit=100', {
             headers: { 'Authorization': `Bearer ${currentToken}` }
           }),
         ]);
 
         const bpData = await bpRes.json();
         const sugarData = await sugarRes.json();
-        const weightData = await weightRes.json();
+        const bmiData = await bmiRes.json();
+
+        console.log('[DEBUG] BP Response:', bpData);
+        console.log('[DEBUG] Sugar Response:', sugarData);
+        console.log('[DEBUG] BMI Response:', bmiData);
 
         const allBpItems = bpData.item || [];
         const allSugarItems = sugarData.item || [];
-        const allWeightItems = weightData.item || [];
+        const allBmiItems = bmiData.item || [];
+
+        console.log('[DEBUG] allBpItems:', allBpItems);
+        console.log('[DEBUG] allSugarItems:', allSugarItems);
+        console.log('[DEBUG] allBmiItems:', allBmiItems);
         
-        // Get most recent items (first item is most recent)
         const latestBp = allBpItems[0];
         const latestSugar = allSugarItems[0];
-        const latestWeight = allWeightItems[0];
+        const latestBmi = allBmiItems[0];
 
-        // Extract values from title
-        const bpValue = latestBp 
-          ? latestBp.title.replace('혈압 기록 - ', '') 
-          : '기록없음';
+        console.log('[DEBUG] latestBp:', latestBp);
+        console.log('[DEBUG] latestSugar:', latestSugar);
+        console.log('[DEBUG] latestBmi:', latestBmi);
 
-        const sugarValue = latestSugar && latestSugar.title
-          ? latestSugar.title.split('- ')[1]?.split('m')[0] || '기록없음' 
-          : '기록없음';
+        let bpValue = '기록없음';
+        if (latestBp?.title) {
+          bpValue = latestBp.title.replace('혈압 기록 - ', '') || '기록없음';
+        }
+
+        let sugarValue = '기록없음';
+        if (latestSugar?.title) {
+          const match = latestSugar.title.match(/(\d+)\s*mg/);
+          sugarValue = match ? match[1] : '기록없음';
+        }
 
         let bmiValue = '기록없음';
-        if (latestWeight) {
-          const weight = parseFloat(latestWeight.title.replace('체중 기록 - ', '').replace('kg', ''));
-          const storedBodyData = localStorage.getItem('bodyData');
-          if (storedBodyData) {
-            const { height } = JSON.parse(storedBodyData);
-            if (height && weight) {
-              const heightM = parseFloat(height) / 100;
-              const bmi = (weight / (heightM * heightM)).toFixed(1);
-              bmiValue = bmi;
-            }
-          }
+        if (latestBmi?.title) {
+          const bmiMatch = latestBmi.title.match(/BMI 기록 - ([\d.]+)/);
+          bmiValue = bmiMatch ? bmiMatch[1] : '기록없음';
+          console.log('[DEBUG] BMI from title:', bmiValue);
         }
+
+        console.log('[DEBUG] Final values - BP:', bpValue, 'Sugar:', sugarValue, 'BMI:', bmiValue);
+
+        localStorage.setItem(healthDataKey, JSON.stringify({
+          bp: bpValue,
+          sugar: sugarValue,
+          bmi: bmiValue,
+          updatedAt: new Date().toISOString()
+        }));
 
         setHealthData({
           bp: { value: bpValue, status: '' },
@@ -90,7 +122,7 @@ export default function HealthDashboard() {
         });
         setLoading(false);
       } catch (error) {
-        console.error('Failed to fetch health data:', error);
+        console.error('[DEBUG] Failed to fetch health data:', error);
         setLoading(false);
       }
     };
@@ -134,7 +166,7 @@ export default function HealthDashboard() {
               unit="Index" 
               icon={<Activity className="text-purple-500 w-4 h-4 sm:w-5 sm:h-5" />} 
               status={healthData.bmi.status || ''}
-              href="/weight"
+              href="/bmi"
               loading={loading}
             />
           </div>

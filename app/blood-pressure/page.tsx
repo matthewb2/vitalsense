@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { useAuthStore } from '@/store/authStore';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
-const API_URL = '/api/posts';
+const API_URL = '/api/posts/';
 
 export default function BloodPressurePage() {
   const { user } = useAuthStore();

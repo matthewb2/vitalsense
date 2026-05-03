@@ -14,12 +14,14 @@ const initialMessages = [
 function ChatContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { isLoggedIn, checkAuth } = useAuthStore();
+  const { user, isLoggedIn, checkAuth } = useAuthStore();
   const [messages, setMessages] = useState(initialMessages);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  
+  
 
   useEffect(() => {
     setMounted(true);
@@ -37,6 +39,7 @@ function ChatContent() {
   }, [messages, loading]);
 
   const handleSendMessage = async () => {
+	
     if (!input.trim() || loading) return;
     
     const userMessage = input.trim();
@@ -55,6 +58,24 @@ function ChatContent() {
       
       const data = await response.json();
       setMessages([...newMessages, { role: 'ai', content: data.content }]);
+
+      const currentToken = user?.token?.accessToken || user?.accessToken;
+      if (currentToken) {
+        await fetch('/api/posts', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'client-id': 'vitalsense',
+            'Authorization': `Bearer ${currentToken}`
+          },
+          body: JSON.stringify({
+            type: 'chat',
+            title: userMessage.slice(0, 50),
+            content: userMessage,
+            extra: { userId: user?._id, userName: user?.name }
+          }),
+        });
+      }
     } catch (error) {
       console.error('Chat error:', error);
       setMessages([...newMessages, { role: 'ai', content: '죄송합니다. 응답을 생성하는 데 오류가 발생했습니다.' }]);
@@ -62,7 +83,6 @@ function ChatContent() {
       setLoading(false);
     }
   };
-
   return (
     <div className="min-h-screen bg-white flex flex-col">
       <Header />
@@ -77,7 +97,7 @@ function ChatContent() {
                 : 'bg-slate-100 text-slate-800'
             }`}>
               {msg.role === 'user' ? msg.content : (
-                <div className="prose prose-lg max-w-none">
+                <div className="prose prose-sm max-w-none">
                   <ReactMarkdown>{msg.content}</ReactMarkdown>
                 </div>
               )}
