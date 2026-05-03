@@ -17,6 +17,8 @@ export default function HealthDashboard() {
     sugar: { value: '', status: '' },
     bmi: { value: '', status: '' },
   });
+  const [todayDiet, setTodayDiet] = useState<any[]>([]);
+  const [todayExercise, setTodayExercise] = useState<any[]>([]);
 
   useEffect(() => {
     setMounted(true);
@@ -29,59 +31,117 @@ export default function HealthDashboard() {
     }
   }, [mounted, isLoggedIn, router]);
 
-  useEffect(() => {
+useEffect(() => {
     const fetchHealthData = async () => {
       try {
         const currentToken = user?.token?.accessToken || user?.accessToken;
-        if (!currentToken) return;
+        const userId = user?._id || user?.extra?.userId;
+        console.log('[DEBUG] user:', user);
+        console.log('[DEBUG] userId:', userId);
+        if (!currentToken || !userId) return;
 
-        const [bpRes, sugarRes, weightRes] = await Promise.all([
-          fetch('/api/posts?type=bp', {
+        const healthDataKey = `healthData_${userId}`;
+        const storedHealthData = localStorage.getItem(healthDataKey);
+        if (storedHealthData) {
+          const parsed = JSON.parse(storedHealthData);
+          console.log('[DEBUG] Loaded from localStorage:', parsed);
+          setHealthData({
+            bp: { value: parsed.bp || '기록없음', status: '' },
+            sugar: { value: parsed.sugar || '기록없음', status: '' },
+            bmi: { value: parsed.bmi || '기록없음', status: '' },
+          });
+        }
+
+        console.log('[DEBUG]Fetching health data...');
+
+        const [bpRes, sugarRes, bmiRes, dietRes, exerciseRes] = await Promise.all([
+          fetch('/api/posts/users?type=bp&limit=100', {
             headers: { 'Authorization': `Bearer ${currentToken}` }
           }),
-          fetch('/api/posts?type=blood-sugar', {
+          fetch('/api/posts/users?type=blood-sugar&limit=100', {
             headers: { 'Authorization': `Bearer ${currentToken}` }
           }),
-          fetch('/api/posts?type=weight', {
+          fetch('/api/posts/users?type=bmi&limit=100', {
+            headers: { 'Authorization': `Bearer ${currentToken}` }
+          }),
+          fetch('/api/posts/users?type=diet&limit=100', {
+            headers: { 'Authorization': `Bearer ${currentToken}` }
+          }),
+          fetch('/api/posts/users?type=exercise&limit=100', {
             headers: { 'Authorization': `Bearer ${currentToken}` }
           }),
         ]);
 
         const bpData = await bpRes.json();
         const sugarData = await sugarRes.json();
-        const weightData = await weightRes.json();
+        const bmiData = await bmiRes.json();
+        const dietData = await dietRes.json();
+        const exerciseData = await exerciseRes.json();
+
+        const today = new Date().toISOString().split('T')[0];
+        
+        const allDietItems = dietData.item || [];
+        const todayDietItems = allDietItems.filter((item: any) => 
+          item.content && item.content.includes(`측정 일시: ${today}`)
+        );
+        
+        const allExerciseItems = exerciseData.item || [];
+        const todayExerciseItems = allExerciseItems.filter((item: any) => 
+          item.content && item.content.includes(`측정 일시: ${today}`)
+        );
+        
+        console.log('[DEBUG] todayDietItems:', todayDietItems);
+        console.log('[DEBUG] todayExerciseItems:', todayExerciseItems);
+        
+        setTodayDiet(todayDietItems);
+        setTodayExercise(todayExerciseItems);
+
+        console.log('[DEBUG] BP Response:', bpData);
+        console.log('[DEBUG] Sugar Response:', sugarData);
+        console.log('[DEBUG] BMI Response:', bmiData);
 
         const allBpItems = bpData.item || [];
         const allSugarItems = sugarData.item || [];
-        const allWeightItems = weightData.item || [];
+        const allBmiItems = bmiData.item || [];
+
+        console.log('[DEBUG] allBpItems:', allBpItems);
+        console.log('[DEBUG] allSugarItems:', allSugarItems);
+        console.log('[DEBUG] allBmiItems:', allBmiItems);
         
-        // Get most recent items (first item is most recent)
         const latestBp = allBpItems[0];
         const latestSugar = allSugarItems[0];
-        const latestWeight = allWeightItems[0];
+        const latestBmi = allBmiItems[0];
 
-        // Extract values from title
-        const bpValue = latestBp 
-          ? latestBp.title.replace('혈압 기록 - ', '') 
-          : '기록없음';
+        console.log('[DEBUG] latestBp:', latestBp);
+        console.log('[DEBUG] latestSugar:', latestSugar);
+        console.log('[DEBUG] latestBmi:', latestBmi);
 
-        const sugarValue = latestSugar && latestSugar.title
-          ? latestSugar.title.split('- ')[1]?.split('m')[0] || '기록없음' 
-          : '기록없음';
+        let bpValue = '기록없음';
+        if (latestBp?.title) {
+          bpValue = latestBp.title.replace('혈압 기록 - ', '') || '기록없음';
+        }
+
+        let sugarValue = '기록없음';
+        if (latestSugar?.title) {
+          const match = latestSugar.title.match(/(\d+)\s*mg/);
+          sugarValue = match ? match[1] : '기록없음';
+        }
 
         let bmiValue = '기록없음';
-        if (latestWeight) {
-          const weight = parseFloat(latestWeight.title.replace('체중 기록 - ', '').replace('kg', ''));
-          const storedBodyData = localStorage.getItem('bodyData');
-          if (storedBodyData) {
-            const { height } = JSON.parse(storedBodyData);
-            if (height && weight) {
-              const heightM = parseFloat(height) / 100;
-              const bmi = (weight / (heightM * heightM)).toFixed(1);
-              bmiValue = bmi;
-            }
-          }
+        if (latestBmi?.title) {
+          const bmiMatch = latestBmi.title.match(/BMI 기록 - ([\d.]+)/);
+          bmiValue = bmiMatch ? bmiMatch[1] : '기록없음';
+          console.log('[DEBUG] BMI from title:', bmiValue);
         }
+
+        console.log('[DEBUG] Final values - BP:', bpValue, 'Sugar:', sugarValue, 'BMI:', bmiValue);
+
+        localStorage.setItem(healthDataKey, JSON.stringify({
+          bp: bpValue,
+          sugar: sugarValue,
+          bmi: bmiValue,
+          updatedAt: new Date().toISOString()
+        }));
 
         setHealthData({
           bp: { value: bpValue, status: '' },
@@ -90,7 +150,7 @@ export default function HealthDashboard() {
         });
         setLoading(false);
       } catch (error) {
-        console.error('Failed to fetch health data:', error);
+        console.error('[DEBUG] Failed to fetch health data:', error);
         setLoading(false);
       }
     };
@@ -134,7 +194,7 @@ export default function HealthDashboard() {
               unit="Index" 
               icon={<Activity className="text-purple-500 w-4 h-4 sm:w-5 sm:h-5" />} 
               status={healthData.bmi.status || ''}
-              href="/weight"
+              href="/bmi"
               loading={loading}
             />
           </div>
@@ -145,14 +205,54 @@ export default function HealthDashboard() {
               <Utensils size={20} /> 오늘 하루 기록
             </h3>
             <div className="space-y-4">
-              <div className="flex justify-between items-center p-3 bg-slate-50 rounded-lg">
-                <span>아침: 닭가슴살 샐러드, 현미밥</span>
-                <span className="text-sm text-slate-400">08:30</span>
-              </div>
-              <div className="flex justify-between items-center p-3 bg-slate-50 rounded-lg">
-                <span>운동: 인터벌 러닝 30분</span>
-                <span className="text-sm text-blue-500 font-medium">-420 kcal</span>
-              </div>
+              {todayDiet.length === 0 ? (
+                <Link href="/diet" className="block">
+                  <div className="flex justify-between items-center p-3 bg-slate-50 rounded-lg cursor-pointer hover:bg-slate-100 transition">
+                    <span className="text-slate-400">식단: 기록없음</span>
+                    <span className="text-sm text-blue-500">기록하기</span>
+                  </div>
+                </Link>
+              ) : (
+                <Link href="/diet" className="block">
+                  <div className="space-y-2">
+                    {todayDiet.map((item, i) => {
+                      const mealType = item.extra?.mealType;
+                      const mealLabel = { breakfast: '아침', lunch: '점심', dinner: '저녁', other: '기타' }[mealType] || '기타';
+                      const content = item.content.split('\n')[1]?.split(': ')[1] || '';
+                      return (
+                        <div key={i} className="flex justify-between items-center p-3 bg-slate-50 rounded-lg cursor-pointer hover:bg-slate-100 transition">
+                          <span>{mealLabel}: {content}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </Link>
+              )}
+
+              {todayExercise.length === 0 ? (
+                <Link href="/exercise" className="block">
+                  <div className="flex justify-between items-center p-3 bg-slate-50 rounded-lg cursor-pointer hover:bg-slate-100 transition">
+                    <span className="text-slate-400">운동: 기록없음</span>
+                    <span className="text-sm text-orange-500">기록하기</span>
+                  </div>
+                </Link>
+              ) : (
+                <Link href="/exercise" className="block">
+                  <div className="space-y-2">
+                    {todayExercise.map((item, i) => {
+                      const exerciseType = item.extra?.exerciseType;
+                      const exerciseLabel = { running: '러닝', walking: '걷기', swimming: '수영', cycling: '자전거', weight: '헬스', yoga: '요가', other: '기타' }[exerciseType] || '기타';
+                      const duration = item.extra?.duration || '';
+                      const calories = item.extra?.calories ? ` -${item.extra.calories}kcal` : '';
+                      return (
+                        <div key={i} className="flex justify-between items-center p-3 bg-slate-50 rounded-lg cursor-pointer hover:bg-slate-100 transition">
+                          <span>운동: {exerciseLabel} {duration}분{calories}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </Link>
+              )}
             </div>
           </div>
         </div>

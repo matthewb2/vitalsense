@@ -43,8 +43,8 @@ export default function Header() {
           <HeartPulse className="text-white w-5 h-5 sm:w-6 sm:h-6" />
         </div>
         <div className="hidden sm:block">
-          <h1 className="text-lg sm:text-2xl font-bold text-slate-800 leading-none tracking-tight">바이탈센스 AI</h1>
-          <p className="text-[8px] sm:text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Big Data Health</p>
+          <h1 className="text-lg sm:text-2xl font-bold text-slate-800 leading-none tracking-tight">바이탈센스</h1>
+          <p className="text-[8px] sm:text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Big Data Health AI</p>
         </div>
       </Link>
 
