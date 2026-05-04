@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Header from '../components/Header';
+import Navigation from '@/components/Navigation';
 import { Dumbbell, Clock, Plus, List, Trash2, ArrowLeft, Flame } from 'lucide-react';
 import Link from 'next/link';
 import { useAuthStore } from '@/store/authStore';
@@ -89,12 +90,25 @@ export default function ExercisePage() {
         const userId = user?._id;
         const filtered = data.item.filter((item: any) => item.user?._id === userId);
 
-        const parsed = filtered.map((item: any) => ({
-          _id: item._id,
-          date: item.content.split('측정 일시: ')[1]?.split('\n')[0] || '',
-          exerciseType: item.extra?.exerciseType || 'other',
-          content: item.content,
-        }));
+        const parsed = filtered.map((item: any) => {
+          let exerciseType = item.extra?.exerciseType || 'other';
+          
+          if (exerciseType === 'other' && item.title) {
+            if (item.title.startsWith('러닝')) exerciseType = 'running';
+            else if (item.title.startsWith('걷기')) exerciseType = 'walking';
+            else if (item.title.startsWith('수영')) exerciseType = 'swimming';
+            else if (item.title.startsWith('자전거')) exerciseType = 'cycling';
+            else if (item.title.startsWith('헬스')) exerciseType = 'weight';
+            else if (item.title.startsWith('요가')) exerciseType = 'yoga';
+          }
+          
+          return {
+            _id: item._id,
+            date: item.content.split('측정 일시: ')[1]?.split('\n')[0] || '',
+            exerciseType: exerciseType,
+            content: item.content,
+          };
+        });
 
         setHistory(parsed);
       }
@@ -228,6 +242,7 @@ export default function ExercisePage() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 p-4 md:p-8">
       <Header />
+      <Navigation />
 
       <main className="max-w-2xl mx-auto mt-6">
         <Link href="/" className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-700 mb-4">

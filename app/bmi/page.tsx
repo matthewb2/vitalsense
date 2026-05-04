@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Header from '../components/Header';
+import Navigation from '@/components/Navigation';
 import { Activity, Calculator, Ruler, Scale, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useAuthStore } from '@/store/authStore';
@@ -171,6 +172,7 @@ export default function BmiPage() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 p-4 md:p-8">
       <Header />
+      <Navigation />
 
       <main className="max-w-2xl mx-auto mt-6">
         <Link href="/" className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-700 mb-4">

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Header from '../components/Header';
+import Navigation from '@/components/Navigation';
 import { Heart, Calendar, Save, List, Plus, Edit2, Trash2, X } from 'lucide-react';
 import Link from 'next/link';
 import { useAuthStore } from '@/store/authStore';
@@ -240,6 +241,7 @@ try {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 p-4 md:p-8">
       <Header />
+      <Navigation />
 
       <main className="max-w-4xl mx-auto mt-6">
         <div className="flex bg-white p-1.5 rounded-2xl shadow-sm mb-8 w-fit mx-auto border border-slate-200">

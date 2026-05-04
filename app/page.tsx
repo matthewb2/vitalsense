@@ -216,7 +216,12 @@ useEffect(() => {
                 <Link href="/diet" className="block">
                   <div className="space-y-2">
                     {todayDiet.map((item, i) => {
-                      const mealType = item.extra?.mealType;
+                      let mealType = item.extra?.mealType;
+                      if (!mealType && item.title) {
+                        if (item.title.startsWith('아침')) mealType = 'breakfast';
+                        else if (item.title.startsWith('점심')) mealType = 'lunch';
+                        else if (item.title.startsWith('저녁')) mealType = 'dinner';
+                      }
                       const mealLabel = { breakfast: '아침', lunch: '점심', dinner: '저녁', other: '기타' }[mealType] || '기타';
                       const content = item.content.split('\n')[1]?.split(': ')[1] || '';
                       return (
@@ -240,13 +245,28 @@ useEffect(() => {
                 <Link href="/exercise" className="block">
                   <div className="space-y-2">
                     {todayExercise.map((item, i) => {
-                      const exerciseType = item.extra?.exerciseType;
+                      let exerciseType = item.extra?.exerciseType;
+                      let duration = item.extra?.duration;
+                      let calories = item.extra?.calories ? ` -${item.extra.calories}kcal` : '';
+                      
+                      if (!exerciseType && item.title) {
+                        if (item.title.startsWith('러닝')) exerciseType = 'running';
+                        else if (item.title.startsWith('걷기')) exerciseType = 'walking';
+                        else if (item.title.startsWith('수영')) exerciseType = 'swimming';
+                        else if (item.title.startsWith('자전거')) exerciseType = 'cycling';
+                        else if (item.title.startsWith('헬스')) exerciseType = 'weight';
+                        else if (item.title.startsWith('요가')) exerciseType = 'yoga';
+                      }
+                      
+                      if (!duration && item.title) {
+                        const durationMatch = item.title.match(/(\d+)분/);
+                        if (durationMatch) duration = durationMatch[1];
+                      }
+                      
                       const exerciseLabel = { running: '러닝', walking: '걷기', swimming: '수영', cycling: '자전거', weight: '헬스', yoga: '요가', other: '기타' }[exerciseType] || '기타';
-                      const duration = item.extra?.duration || '';
-                      const calories = item.extra?.calories ? ` -${item.extra.calories}kcal` : '';
                       return (
                         <div key={i} className="flex justify-between items-center p-3 bg-slate-50 rounded-lg cursor-pointer hover:bg-slate-100 transition">
-                          <span>운동: {exerciseLabel} {duration}분{calories}</span>
+                          <span>운동: {exerciseLabel} {duration ? `${duration}분` : ''}{calories}</span>
                         </div>
                       );
                     })}

@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import Header from '../components/Header';
-import { Utensils, Clock, Plus, List, Edit2, Trash2, ArrowLeft } from 'lucide-react';
+import Navigation from '@/components/Navigation';
+import { Utensils, Clock, Plus, List, Trash2, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useAuthStore } from '@/store/authStore';
 
@@ -71,12 +72,22 @@ export default function DietPage() {
         const userId = user?._id;
         const filtered = data.item.filter((item: any) => item.user?._id === userId);
 
-        const parsed = filtered.map((item: any) => ({
-          _id: item._id,
-          date: item.content.split('측정 일시: ')[1]?.split('\n')[0] || '',
-          mealType: item.extra?.mealType || 'other',
-          content: item.content,
-        }));
+        const parsed = filtered.map((item: any) => {
+          let mealType = item.extra?.mealType || 'other';
+          
+          if (mealType === 'other' && item.title) {
+            if (item.title.startsWith('아침')) mealType = 'breakfast';
+            else if (item.title.startsWith('점심')) mealType = 'lunch';
+            else if (item.title.startsWith('저녁')) mealType = 'dinner';
+          }
+          
+          return {
+            _id: item._id,
+            date: item.content.split('측정 일시: ')[1]?.split('\n')[0] || '',
+            mealType: mealType,
+            content: item.content,
+          };
+        });
 
         setHistory(parsed);
       }
@@ -161,14 +172,6 @@ export default function DietPage() {
     }
   };
 
-  const groupedHistory = history.reduce((acc, item) => {
-    if (!acc[item.date]) {
-      acc[item.date] = [];
-    }
-    acc[item.date].push(item);
-    return acc;
-  }, {} as Record<string, FoodRecord[]>);
-
   const TabButton = ({ active, onClick, icon, label }: { active: boolean; onClick: () => void; icon: React.ReactNode; label: string }) => (
     <button
       onClick={onClick}
@@ -184,6 +187,7 @@ export default function DietPage() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 p-4 md:p-8">
       <Header />
+      <Navigation />
 
       <main className="max-w-2xl mx-auto mt-6">
         <Link href="/" className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-700 mb-4">
@@ -206,39 +210,47 @@ export default function DietPage() {
         </div>
 
         {activeTab === 'list' ? (
-          <div className="space-y-6">
-            {Object.keys(groupedHistory).length === 0 ? (
-              <div className="bg-white rounded-3xl p-8 text-center text-slate-400">
+          <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+            {history.length === 0 ? (
+              <div className="p-8 text-center text-slate-400">
                 기록된 식사 데이터가 없습니다.
               </div>
             ) : (
-              Object.entries(groupedHistory).map(([date, items]) => (
-                <div key={date} className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
-                  <div className="p-4 bg-slate-50 border-b border-slate-100">
-                    <h3 className="font-bold text-slate-700">{date}</h3>
-                  </div>
-                  <div className="divide-y divide-slate-50">
-                    {items.map((item) => (
-                      <div key={item._id} className="p-4 flex items-start gap-4">
-                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${mealColors[item.mealType as MealType]}`}>
-                          {mealLabels[item.mealType as MealType]}
-                        </span>
-                        <div className="flex-1">
-                          <p className="text-sm text-slate-600">
-                            {item.content.split('\n')[1]?.split(': ')[1] || ''}
-                          </p>
-                        </div>
-                        <button
-                          onClick={() => handleDelete(item)}
-                          className="p-2 text-red-400 hover:bg-red-50 rounded-lg transition"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-slate-50 text-slate-500 font-medium">
+                    <tr>
+                      <th className="p-4">날짜</th>
+                      <th className="p-4">식사</th>
+                      <th className="p-4">메뉴</th>
+                      <th className="p-4">관리</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {history.map((item) => (
+                      <tr key={item._id} className="hover:bg-slate-50/50 transition">
+                        <td className="p-4 font-medium">{item.date}</td>
+                        <td className="p-4">
+                          <span className={`px-3 py-1 rounded-full text-xs font-bold ${mealColors[item.mealType as MealType]}`}>
+                            {mealLabels[item.mealType as MealType]}
+                          </span>
+                        </td>
+                        <td className="p-4 text-slate-600">
+                          {item.content.split('\n')[1]?.split(': ')[1] || ''}
+                        </td>
+                        <td className="p-4">
+                          <button
+                            onClick={() => handleDelete(item)}
+                            className="p-2 text-red-400 hover:bg-red-50 rounded-lg transition"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </td>
+                      </tr>
                     ))}
-                  </div>
-                </div>
-              ))
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
         ) : (
@@ -264,7 +276,7 @@ export default function DietPage() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-bold text-slate-600">식사 类型</label>
+                <label className="text-sm font-bold text-slate-600">식사 유형</label>
                 <div className="grid grid-cols-4 gap-2">
                   {(['breakfast', 'lunch', 'dinner', 'other'] as MealType[]).map((type) => (
                     <button
