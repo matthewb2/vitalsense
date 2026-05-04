@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Header from '../components/Header';
 import Navigation from '@/components/Navigation';
-import { Dumbbell, Clock, Plus, List, Trash2, ArrowLeft, Flame } from 'lucide-react';
+import { Dumbbell, Clock, Plus, List, Trash2, ArrowLeft, Flame, Edit2, X } from 'lucide-react';
 import Link from 'next/link';
 import { useAuthStore } from '@/store/authStore';
 
@@ -61,6 +61,8 @@ export default function ExercisePage() {
     calories: '',
     content: '',
   });
+  const [editModal, setEditModal] = useState<{open: boolean; item: ExerciseRecord | null}>({open: false, item: null});
+  const [editForm, setEditForm] = useState({ date: '', exerciseType: 'running' as ExerciseType, duration: '', calories: '', content: '' });
 
   useEffect(() => {
     checkAuth();
@@ -219,6 +221,59 @@ export default function ExercisePage() {
     }
   };
 
+  const handleEdit = (item: ExerciseRecord) => {
+    const durationMatch = item.content.match(/시간: (\d+)분/);
+    const caloriesMatch = item.content.match(/소모 칼로리: (\d+)kcal/);
+    const contentMatch = item.content.match(/메모: (.+)/);
+    
+    setEditForm({
+      date: item.date,
+      exerciseType: item.exerciseType,
+      duration: durationMatch ? durationMatch[1] : '',
+      calories: caloriesMatch ? caloriesMatch[1] : '',
+      content: contentMatch ? contentMatch[1] : '',
+    });
+    setEditModal({ open: true, item });
+  };
+
+  const handleUpdate = async () => {
+    if (!editModal.item) return;
+    
+    const currentUser = useAuthStore.getState().user;
+    const currentToken = currentUser?.token?.accessToken || currentUser?.accessToken;
+    
+    if (!currentToken) return;
+    
+    try {
+      await fetch(API_URL, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'client-id': 'vitalsense',
+          'Authorization': `Bearer ${currentToken}`
+        },
+        body: JSON.stringify({
+          id: editModal.item._id,
+          type: 'exercise',
+          title: `${exerciseLabels[editForm.exerciseType as ExerciseType]} - ${editForm.duration}분${editForm.calories ? ` (${editForm.calories}kcal)` : ''}`,
+          content: `측정 일시: ${editForm.date}\n운동: ${exerciseLabels[editForm.exerciseType as ExerciseType]}\n시간: ${editForm.duration}분${editForm.calories ? `\n소모 칼로리: ${editForm.calories}kcal` : ''}${editForm.content ? `\n메모: ${editForm.content}` : ''}`,
+          extra: { 
+            userId: user?._id, 
+            userName: user?.name,
+            exerciseType: editForm.exerciseType,
+            duration: editForm.duration,
+            calories: editForm.calories,
+          },
+        }),
+      });
+      
+      setEditModal({ open: false, item: null });
+      fetchHistory(currentToken);
+    } catch (error) {
+      console.error('Error updating:', error);
+    }
+  };
+
   const groupedHistory = history.reduce((acc, item) => {
     if (!acc[item.date]) {
       acc[item.date] = [];
@@ -245,9 +300,6 @@ export default function ExercisePage() {
       <Navigation />
 
       <main className="max-w-2xl mx-auto mt-6">
-        <Link href="/" className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-700 mb-4">
-          <ArrowLeft size={20} /> 메인으로
-        </Link>
 
         <div className="flex bg-white p-1.5 rounded-2xl shadow-sm mb-8 w-fit mx-auto border border-slate-200">
           <TabButton
@@ -265,44 +317,61 @@ export default function ExercisePage() {
         </div>
 
         {activeTab === 'list' ? (
-          <div className="space-y-6">
-            {Object.keys(groupedHistory).length === 0 ? (
-              <div className="bg-white rounded-3xl p-8 text-center text-slate-400">
+          <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+            {history.length === 0 ? (
+              <div className="p-8 text-center text-slate-400">
                 기록된 운동 데이터가 없습니다.
               </div>
             ) : (
-              Object.entries(groupedHistory).map(([date, items]) => (
-                <div key={date} className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
-                  <div className="p-4 bg-slate-50 border-b border-slate-100">
-                    <h3 className="font-bold text-slate-700">{date}</h3>
-                  </div>
-                  <div className="divide-y divide-slate-50">
-                    {items.map((item) => {
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-slate-50 text-slate-500 font-medium">
+                    <tr>
+                      <th className="p-4">날짜</th>
+                      <th className="p-4">종류</th>
+                      <th className="p-4">시간</th>
+                      <th className="p-4">칼로리</th>
+                      <th className="p-4">관리</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {history.map((item) => {
                       const match = item.content.match(/시간: (\d+)분/);
                       const caloriesMatch = item.content.match(/소모 칼로리: (\d+)kcal/);
+                      const duration = match ? match[1] : '';
+                      const calories = caloriesMatch ? caloriesMatch[1] : '';
                       return (
-                        <div key={item._id} className="p-4 flex items-start gap-4">
-                          <span className={`px-3 py-1 rounded-full text-xs font-bold ${exerciseColors[item.exerciseType as ExerciseType]}`}>
-                            {exerciseLabels[item.exerciseType as ExerciseType]}
-                          </span>
-                          <div className="flex-1">
-                            <p className="text-sm text-slate-600">
-                              {match && `${match[1]}분`}
-                              {caloriesMatch && <span className="ml-2 text-orange-500">{caloriesMatch[1]}kcal</span>}
-                            </p>
-                          </div>
-                          <button
-                            onClick={() => handleDelete(item)}
-                            className="p-2 text-red-400 hover:bg-red-50 rounded-lg transition"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
+                        <tr key={item._id} className="hover:bg-slate-50/50 transition">
+                          <td className="p-4 font-medium">{item.date}</td>
+                          <td className="p-4">
+                            <span className={`px-3 py-1 rounded-full text-xs font-bold ${exerciseColors[item.exerciseType as ExerciseType]}`}>
+                              {exerciseLabels[item.exerciseType as ExerciseType]}
+                            </span>
+                          </td>
+                          <td className="p-4 text-slate-600">{duration ? `${duration}분` : '-'}</td>
+                          <td className="p-4 text-orange-500 font-medium">{calories ? `${calories}kcal` : '-'}</td>
+                          <td className="p-4">
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => handleEdit(item)}
+                                className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition"
+                              >
+                                <Edit2 size={16} />
+                              </button>
+                              <button
+                                onClick={() => handleDelete(item)}
+                                className="p-2 text-red-400 hover:bg-red-50 rounded-lg transition"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
                       );
                     })}
-                  </div>
-                </div>
-              ))
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
         ) : (
@@ -390,6 +459,84 @@ export default function ExercisePage() {
                 {saved ? '저장됨!' : loading ? '저장 중...' : '저장'}
               </button>
             </form>
+          </div>
+        )}
+
+        {editModal.open && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden">
+              <div className="p-4 border-b flex justify-between items-center">
+                <h3 className="font-bold">운동 기록 수정</h3>
+                <button onClick={() => setEditModal({open: false, item: null})} className="p-2 hover:bg-slate-100 rounded-full">
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="p-6 space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-slate-600">날짜</label>
+                  <input
+                    type="date"
+                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-orange-500"
+                    value={editForm.date}
+                    onChange={(e) => setEditForm({...editForm, date: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-slate-600">운동 유형</label>
+                  <div className="grid grid-cols-4 gap-2">
+                    {(['running', 'walking', 'swimming', 'cycling', 'weight', 'yoga', 'other'] as ExerciseType[]).map((type) => (
+                      <button
+                        key={type}
+                        type="button"
+                        onClick={() => setEditForm({...editForm, exerciseType: type})}
+                        className={`p-2 rounded-xl text-sm font-bold transition ${
+                          editForm.exerciseType === type
+                            ? exerciseColors[type]
+                            : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                        }`}
+                      >
+                        {exerciseLabels[type]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-slate-600">시간 (분)</label>
+                    <input
+                      type="number"
+                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-orange-500 font-mono"
+                      value={editForm.duration}
+                      onChange={(e) => setEditForm({...editForm, duration: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-slate-600">칼로리</label>
+                    <input
+                      type="number"
+                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-orange-500 font-mono"
+                      value={editForm.calories}
+                      onChange={(e) => setEditForm({...editForm, calories: e.target.value})}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-slate-600">메모</label>
+                  <textarea
+                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-orange-500 resize-none h-20"
+                    value={editForm.content}
+                    onChange={(e) => setEditForm({...editForm, content: e.target.value})}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleUpdate}
+                  className="w-full py-3 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-600 transition"
+                >
+                  수정하기
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </main>

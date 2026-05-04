@@ -18,7 +18,7 @@ export default function Navigation() {
   const pathname = usePathname();
 
   return (
-    <nav className="bg-white border-b border-slate-200 sticky top-14 z-40">
+    <nav className="bg-white border-b border-slate-200 top-14 z-40">
       <div className="max-w-6xl mx-auto px-4">
         <div className="flex justify-center gap-1 py-2 overflow-x-auto">
           {navItems.map((item) => {
