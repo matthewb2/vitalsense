@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Header from '../components/Header';
 import Navigation from '@/components/Navigation';
-import { Utensils, Clock, Plus, List, Trash2, Edit2, X, ImagePlus, Camera } from 'lucide-react';
+import { Utensils, Clock, Plus, List, Trash2, Edit2, X, ImagePlus, Camera, Loader2 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 
 const API_URL = '/api/posts';
@@ -23,6 +23,7 @@ interface FoodRecord {
   date: string;
   mealType: MealType;
   content: string;
+  calories?: string;
   image?: string | null;
 }
 
@@ -50,10 +51,94 @@ export default function DietPage() {
     date: new Date().toISOString().split('T')[0],
     mealType: 'breakfast' as MealType,
     content: '',
+    calories: '',
     image: null as string | null,
   });
   const [editModal, setEditModal] = useState<{open: boolean; item: FoodRecord | null}>({open: false, item: null});
-  const [editForm, setEditForm] = useState({ date: '', mealType: 'breakfast' as MealType, content: '', image: null as string | null });
+  const [editForm, setEditForm] = useState({ date: '', mealType: 'breakfast' as MealType, content: '', calories: '', image: null as string | null });
+  
+  // AI 분석 상태 관리
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analysisResult, setAnalysisResult] = useState<{food_name: string; calories: number} | null>(null);
+
+// Groq API 이미지 분석 함수
+  const analyzeImage = async (base64Image: string) => {
+    const apiKey = process.env.NEXT_PUBLIC_GROQ_API_KEY;
+    console.log('[AI] API Key loaded:', apiKey ? 'YES' : 'NO');
+    console.log('[AI] base64Image length:', base64Image?.length);
+    if (!apiKey || !base64Image) {
+      console.warn('[AI] GROQ_API_KEY가 설정되지 않았습니다.');
+      return;
+    }
+    console.log('[AI] 이미지 분석 시작...');
+    setAnalyzing(true);
+    setAnalysisResult(null);
+
+    try {
+      console.log('[AI] Groq API 요청 전송 중...', { model: 'meta-llama/llama-4-scout-17b-16e-instruct' });
+      const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "meta-llama/llama-4-scout-17b-16e-instruct",
+          messages: [
+            {
+              role: "user",
+              content: [
+                { type: "text", text: "Analyze this food image and estimate calories. Response MUST be valid JSON: {\"calories\": 350, \"food_name\": \"duck\"}. Use ONLY ASCII characters, no special characters." },
+                {
+                  type: "image_url",
+                  image_url: { url: `data:image/jpeg;base64,${base64Image}` },
+                },
+              ],
+            },
+          ],
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[AI] Groq API Error:', response.status, errorText);
+        throw new Error(`API request failed: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('[AI] Groq API Response raw:', data);
+      const content = data.choices?.[0]?.message?.content;
+      console.log('[AI] Groq API content raw:', content);
+      if (content) {
+        try {
+          let cleanContent = content.trim();
+          if (!cleanContent.startsWith('{')) {
+            const braceStart = cleanContent.indexOf('{');
+            if (braceStart >= 0) cleanContent = cleanContent.substring(braceStart);
+          }
+          if (!cleanContent.endsWith('}')) {
+            const braceEnd = cleanContent.lastIndexOf('}');
+            if (braceEnd >= 0) cleanContent = cleanContent.substring(0, braceEnd + 1);
+          }
+          console.log('[AI] Cleaned content:', cleanContent);
+          const parsed = JSON.parse(cleanContent);
+          console.log('[AI] 분석 결과:', parsed);
+          setAnalysisResult(parsed);
+          if (parsed.calories) {
+            setFormData(prev => ({ ...prev, calories: String(parsed.calories) }));
+            console.log('[AI] 칼로리 자동 입력:', parsed.calories);
+          }
+        } catch (parseError) {
+          console.error('[AI] JSON parse error:', parseError, "Content:", content);
+        }
+      }
+    } catch (error) {
+      console.error('[AI] 분석 중 오류 발생:', error);
+    } finally {
+      setAnalyzing(false);
+      console.log('[AI] 분석 완료');
+    }
+  };
 
   const compressImage = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -67,7 +152,7 @@ export default function DietPage() {
           const ctx = canvas.getContext('2d');
           let width = img.width;
           let height = img.height;
-          const maxDimension = 1200;
+          const maxDimension = 800;
           if (width > maxDimension || height > maxDimension) {
             if (width > height) {
               height = (height / width) * maxDimension;
@@ -80,12 +165,7 @@ export default function DietPage() {
           canvas.width = width;
           canvas.height = height;
           ctx?.drawImage(img, 0, 0, width, height);
-          let quality = 0.9;
-          let dataUrl = canvas.toDataURL('image/jpeg', quality);
-          while (dataUrl.length > 102400 && quality > 0.1) {
-            quality -= 0.1;
-            dataUrl = canvas.toDataURL('image/jpeg', quality);
-          }
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
           resolve(dataUrl);
         };
         img.onerror = reject;
@@ -100,8 +180,12 @@ export default function DietPage() {
     try {
       const compressed = await compressImage(file);
       setFormData(prev => ({ ...prev, image: compressed }));
+      
+      // 이미지 선택 즉시 분석 시작
+      const base64Only = compressed.split(',')[1];
+      await analyzeImage(base64Only);
     } catch (error) {
-      console.error('Image compression error:', error);
+      console.error('이미지 처리 오류:', error);
     }
   };
 
@@ -141,7 +225,8 @@ export default function DietPage() {
             date: item.content.split('측정 일시: ')[1]?.split('\n')[0] || '',
             mealType: mealType,
             content: item.content,
-            image: item.image || null,
+            calories: item.extra?.calories?.toString() || '',
+            image: item.image ? getImageUrl(item.image) : null,
           };
         });
         setHistory(parsed);
@@ -162,7 +247,7 @@ export default function DietPage() {
 
     try {
       let imagePath = null;
-      if (formData.image) {
+      if (formData.image && formData.image.startsWith('data:')) {
         const base64Data = formData.image.split(',')[1];
         const byteCharacters = atob(base64Data);
         const byteNumbers = new Array(byteCharacters.length);
@@ -191,6 +276,9 @@ export default function DietPage() {
         }
       }
 
+      const calorieInfo = formData.calories ? `\n(칼로리: ${formData.calories}kcal)` : "";
+      const finalContent = `측정 일시: ${formData.date}\n${mealLabels[formData.mealType]}: ${formData.content}${calorieInfo}`;
+
       const response = await fetch(API_URL, {
         method: 'POST',
         headers: {
@@ -200,13 +288,14 @@ export default function DietPage() {
         },
         body: JSON.stringify({
           type: 'diet',
-          title: `${mealLabels[formData.mealType as MealType]} - ${formData.content.slice(0, 20)}`,
-          content: `측정 일시: ${formData.date}\n${mealLabels[formData.mealType as MealType]}: ${formData.content}`,
+          title: `${mealLabels[formData.mealType]} - ${formData.content.slice(0, 20)}`,
+          content: finalContent,
           image: imagePath,
           extra: { 
             userId: user?._id, 
             userName: user?.name,
-            mealType: formData.mealType 
+            mealType: formData.mealType,
+            calories: formData.calories || null
           },
         }),
       });
@@ -218,8 +307,10 @@ export default function DietPage() {
           date: new Date().toISOString().split('T')[0],
           mealType: 'breakfast',
           content: '',
+          calories: '',
           image: null,
         });
+        setAnalysisResult(null);
         setTimeout(() => {
           setSaved(false);
           setActiveTab('list');
@@ -254,10 +345,12 @@ export default function DietPage() {
 
   const handleEdit = (item: FoodRecord) => {
     const content = item.content.split('\n')[1]?.split(': ')[1] || '';
+    const calories = item.calories?.toString() || '';
     setEditForm({
       date: item.date,
       mealType: item.mealType,
       content: content,
+      calories: calories,
       image: item.image || null,
     });
     setEditModal({ open: true, item });
@@ -295,10 +388,9 @@ export default function DietPage() {
         const blob = new Blob([byteArray], { type: 'image/jpeg' });
 
         const uploadFormData = new FormData();
-        uploadFormData.append('post', new Blob([JSON.stringify({ type: 'diet-temp', title: 'temp', content: 'temp' })], { type: 'application/json' }));
         uploadFormData.append('file', blob, 'image.jpg');
 
-        const uploadResponse = await fetch('/api/posts/with-image', {
+        const uploadResponse = await fetch('/api/files', {
           method: 'POST',
           headers: {
             'client-id': 'vitalsense',
@@ -308,7 +400,8 @@ export default function DietPage() {
         });
 
         const uploadResult = await uploadResponse.json();
-        imageValue = uploadResult.image || uploadResult.path || uploadResult.url || null;
+        const fullPath = uploadResult.path || uploadResult.item?.[0]?.path || uploadResult.url;
+        imageValue = fullPath ? fullPath.split('/').pop() : null;
       }
 
       await fetch(API_URL, {
@@ -322,12 +415,13 @@ export default function DietPage() {
           id: editModal.item._id,
           type: 'diet',
           title: `${mealLabels[editForm.mealType as MealType]} - ${editForm.content.slice(0, 20)}`,
-          content: `측정 일시: ${editForm.date}\n${mealLabels[editForm.mealType as MealType]}: ${editForm.content}`,
+          content: `측정 일시: ${editForm.date}\n${mealLabels[editForm.mealType as MealType]}: ${editForm.content}${editForm.calories ? `\n(칼로리: ${editForm.calories}kcal)` : ''}`,
           image: imageValue,
           extra: { 
             userId: user?._id, 
             userName: user?.name,
-            mealType: editForm.mealType 
+            mealType: editForm.mealType,
+            calories: editForm.calories || null
           },
         }),
       });
@@ -382,14 +476,14 @@ export default function DietPage() {
                       <tr key={item._id} className="hover:bg-slate-50/50 transition">
                         <td className="p-4 font-medium">{item.date}</td>
                         <td className="p-4">
-                          <span className={`px-3 py-1 rounded-full text-xs font-bold ${mealColors[item.mealType as MealType]}`}>
-                            {mealLabels[item.mealType as MealType]}
+                          <span className={`px-3 py-1 rounded-full text-xs font-bold ${mealColors[item.mealType]}`}>
+                            {mealLabels[item.mealType]}
                           </span>
                         </td>
-                        <td className="p-4 text-slate-600">{item.content.split('\n')[1]?.split(': ')[1] || ''}</td>
+                        <td className="p-4 text-slate-600 truncate max-w-[150px]">{item.content.split('\n')[1]?.split(': ')[1] || ''}</td>
                         <td className="p-4">
                           {item.image && (
-                            <img src={item.image} alt="food" className="w-12 h-12 object-cover rounded-lg" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                            <img src={item.image} alt="food" className="w-12 h-12 object-cover rounded-lg border" />
                           )}
                         </td>
                         <td className="p-4">
@@ -423,38 +517,67 @@ export default function DietPage() {
                   ))}
                 </div>
               </div>
-              <div className="space-y-2">
+<div className="space-y-2">
                 <label className="text-sm font-bold text-slate-600">메뉴</label>
                 <textarea placeholder="예: 삼겹살, 채소 소스, 밥 한 공기" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 h-24" value={formData.content} onChange={(e) => setFormData({...formData, content: e.target.value})} />
               </div>
+              
               <div className="space-y-2">
-                <label className="text-sm font-bold text-slate-600 flex items-center gap-1"><Camera size={14} /> 사진 업로드</label>
-                <div className="flex items-center gap-4">
-                  <label className="flex items-center gap-2 px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-100 transition">
-                    <ImagePlus size={20} className="text-slate-500" /><span className="text-sm text-slate-600">사진 선택</span>
+                <label className="text-sm font-bold text-slate-600">칼로리 (kcal)</label>
+                <input type="number" placeholder="예: 500" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-green-500" value={formData.calories} onChange={(e) => setFormData({...formData, calories: e.target.value})} />
+              </div>
+               
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-slate-600 flex items-center gap-1"><Camera size={14} /> 사진 업로드 & 칼로리 분석</label>
+                <div className="flex items-center gap-4 flex-wrap">
+                  <label className="flex items-center gap-2 px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl cursor-pointer hover:bg-slate-100 transition border-dashed">
+                    <ImagePlus size={20} className="text-slate-500" />
+                    <span className="text-sm text-slate-600 font-medium">사진 선택</span>
                     <input type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
                   </label>
+
+                  {/* 사진 미리보기 */}
                   {formData.image && (
-                    <div className="relative">
-                      <img src={formData.image} alt="preview" className="w-16 h-16 object-cover rounded-lg" />
-                      <button type="button" onClick={() => setFormData(prev => ({ ...prev, image: null }))} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1"><X size={12} /></button>
+                    <div className="relative group">
+                      <img src={formData.image} alt="preview" className="w-16 h-16 object-cover rounded-xl border-2 border-green-500 shadow-sm" />
+                      <button type="button" onClick={() => { setFormData(prev => ({ ...prev, image: null })); setAnalysisResult(null); }} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-md group-hover:scale-110 transition"><X size={12} /></button>
+                    </div>
+                  )}
+
+                  {/* 분석 상태 및 결과 표시 */}
+                  {analyzing && (
+                    <div className="flex items-center gap-2 text-blue-500 bg-blue-50 px-3 py-2 rounded-xl border border-blue-100 animate-pulse">
+                      <Loader2 size={16} className="animate-spin" />
+                      <span className="text-xs font-bold">AI 분석 중...</span>
+                    </div>
+                  )}
+                  
+                  {analysisResult && (
+                    <div className="bg-emerald-50 border border-emerald-100 px-4 py-2 rounded-xl flex flex-col justify-center shadow-sm">
+                      <span className="text-[10px] text-emerald-500 font-bold uppercase tracking-tighter">AI Result</span>
+                      <div className="flex items-center gap-1">
+                        <span className="text-sm font-bold text-emerald-700">{analysisResult.calories}</span>
+                        <span className="text-[10px] text-emerald-600 font-medium pt-0.5">kcal</span>
+                      </div>
                     </div>
                   )}
                 </div>
               </div>
-              <button type="submit" disabled={loading || !formData.content.trim()} className="w-full py-4 bg-green-500 text-white font-bold rounded-2xl hover:bg-green-600 transition disabled:opacity-50">
-                {saved ? '저장됨!' : loading ? '저장 중...' : '저장'}
+
+              <button type="submit" disabled={loading || !formData.content.trim()} className="w-full py-4 bg-green-500 text-white font-bold rounded-2xl hover:bg-green-600 shadow-lg shadow-green-200 transition disabled:opacity-50">
+                {saved ? '저장 완료!' : loading ? '저장 중...' : '식사 기록 저장하기'}
               </button>
             </form>
           </div>
         )}
 
+        {/* 수정 모달 영역 */}
         {editModal.open && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden">
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+            <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl">
               <div className="p-4 border-b flex justify-between items-center">
                 <h3 className="font-bold">식단 기록 수정</h3>
-                <button onClick={() => setEditModal({open: false, item: null})} className="p-2 hover:bg-slate-100 rounded-full"><X size={20} /></button>
+                <button onClick={() => setEditModal({open: false, item: null})} className="p-2 hover:bg-slate-100 rounded-full transition"><X size={20} /></button>
               </div>
               <div className="p-6 space-y-4">
                 <div className="space-y-2">
@@ -471,7 +594,11 @@ export default function DietPage() {
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-bold text-slate-600">메뉴</label>
-                  <textarea className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl h-20" value={editForm.content} onChange={(e) => setEditForm({...editForm, content: e.target.value})} />
+                  <textarea className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl h-20 outline-none focus:ring-2 focus:ring-green-500" value={editForm.content} onChange={(e) => setEditForm({...editForm, content: e.target.value})} />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-slate-600">칼로리 (kcal)</label>
+                  <input type="number" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl" value={editForm.calories} onChange={(e) => setEditForm({...editForm, calories: e.target.value})} />
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-bold text-slate-600 flex items-center gap-1"><Camera size={14} /> 사진 변경</label>
@@ -481,14 +608,14 @@ export default function DietPage() {
                       <input type="file" accept="image/*" className="hidden" onChange={handleEditImageChange} />
                     </label>
                     {editForm.image && (
-                      <div className="relative">
-                        <img src={editForm.image} alt="preview" className="w-16 h-16 object-cover rounded-lg" />
-                        <button type="button" onClick={() => setEditForm(prev => ({ ...prev, image: null }))} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1"><X size={12} /></button>
+                      <div className="relative group">
+                        <img src={getImageUrl(editForm.image) || ""} alt="preview" className="w-16 h-16 object-cover rounded-lg border shadow-sm" />
+                        <button type="button" onClick={() => setEditForm(prev => ({ ...prev, image: null }))} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition"><X size={12} /></button>
                       </div>
                     )}
                   </div>
                 </div>
-                <button type="button" onClick={handleUpdate} className="w-full py-3 bg-green-500 text-white font-bold rounded-xl hover:bg-green-600 transition">수정하기</button>
+                <button type="button" onClick={handleUpdate} className="w-full py-4 bg-green-500 text-white font-bold rounded-2xl hover:bg-green-600 transition shadow-md">수정 사항 저장</button>
               </div>
             </div>
           </div>
