@@ -3,18 +3,17 @@
 import React, { useState, useEffect } from 'react';
 import Header from '../components/Header';
 import Navigation from '@/components/Navigation';
-import { Utensils, Clock, Plus, List, Trash2, ArrowLeft, Edit2, X, ImagePlus, Camera } from 'lucide-react';
-import Link from 'next/link';
+import { Utensils, Clock, Plus, List, Trash2, Edit2, X, ImagePlus, Camera } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 
 const API_URL = '/api/posts';
-const IMAGE_BASE_URL = 'https://firm-catherine-mk-solution-5ac59407.koyeb.app/images';
+const IMAGE_HOST_URL = 'http://mksolution.dothome.co.kr/images';
 
 const getImageUrl = (imagePath: string | null | undefined): string | null => {
   if (!imagePath) return null;
   if (imagePath.startsWith('data:')) return imagePath;
-  if (imagePath.startsWith('http')) return imagePath;
-  return `${IMAGE_BASE_URL}/${imagePath}`;
+  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) return imagePath;
+  return `${IMAGE_HOST_URL}/${imagePath}`;
 };
 
 type MealType = 'breakfast' | 'lunch' | 'dinner' | 'other';
@@ -66,10 +65,8 @@ export default function DietPage() {
         img.onload = () => {
           const canvas = document.createElement('canvas');
           const ctx = canvas.getContext('2d');
-          
           let width = img.width;
           let height = img.height;
-          
           const maxDimension = 1200;
           if (width > maxDimension || height > maxDimension) {
             if (width > height) {
@@ -80,19 +77,15 @@ export default function DietPage() {
               height = maxDimension;
             }
           }
-          
           canvas.width = width;
           canvas.height = height;
           ctx?.drawImage(img, 0, 0, width, height);
-          
           let quality = 0.9;
           let dataUrl = canvas.toDataURL('image/jpeg', quality);
-          
           while (dataUrl.length > 102400 && quality > 0.1) {
             quality -= 0.1;
             dataUrl = canvas.toDataURL('image/jpeg', quality);
           }
-          
           resolve(dataUrl);
         };
         img.onerror = reject;
@@ -104,7 +97,6 @@ export default function DietPage() {
   const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    
     try {
       const compressed = await compressImage(file);
       setFormData(prev => ({ ...prev, image: compressed }));
@@ -120,9 +112,7 @@ export default function DietPage() {
   useEffect(() => {
     if (user?._id) {
       const token = user?.token?.accessToken || user?.accessToken;
-      if (token) {
-        fetchHistory(token);
-      }
+      if (token) fetchHistory(token);
     }
   }, [user?._id, user?.token]);
 
@@ -136,20 +126,16 @@ export default function DietPage() {
         },
       });
       const data = await response.json();
-
       if (data.ok && data.item) {
         const userId = user?._id;
         const filtered = data.item.filter((item: any) => item.user?._id === userId);
-
         const parsed = filtered.map((item: any) => {
           let mealType = item.extra?.mealType || 'other';
-          
           if (mealType === 'other' && item.title) {
             if (item.title.startsWith('아침')) mealType = 'breakfast';
             else if (item.title.startsWith('점심')) mealType = 'lunch';
             else if (item.title.startsWith('저녁')) mealType = 'dinner';
           }
-          
           return {
             _id: item._id,
             date: item.content.split('측정 일시: ')[1]?.split('\n')[0] || '',
@@ -158,7 +144,6 @@ export default function DietPage() {
             image: item.image || null,
           };
         });
-
         setHistory(parsed);
       }
     } catch (err) {
@@ -169,40 +154,16 @@ export default function DietPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.content.trim()) return;
-
     setLoading(true);
 
     const currentUser = useAuthStore.getState().user;
     const currentToken = currentUser?.token?.accessToken || currentUser?.accessToken;
-
-    if (!currentToken) {
-      setLoading(false);
-      return;
-    }
+    if (!currentToken) { setLoading(false); return; }
 
     try {
-      const postData = {
-        type: 'diet',
-        title: `${mealLabels[formData.mealType as MealType]} - ${formData.content.slice(0, 20)}`,
-        content: `측정 일시: ${formData.date}\n${mealLabels[formData.mealType as MealType]}: ${formData.content}`,
-        extra: { 
-          userId: user?._id, 
-          userName: user?.name,
-          mealType: formData.mealType 
-        },
-      };
-
-      console.log('[DEBUG] postData:', postData);
-      console.log('[DEBUG] formData.image exists:', !!formData.image);
-
-      const formDataToSend = new FormData();
-      formDataToSend.append('post', new Blob([JSON.stringify(postData)], { type: 'application/json' }));
-      console.log('[DEBUG] post blob added to FormData');
-
+      let imagePath = null;
       if (formData.image) {
         const base64Data = formData.image.split(',')[1];
-        console.log('[DEBUG] base64Data length:', base64Data.length);
-        
         const byteCharacters = atob(base64Data);
         const byteNumbers = new Array(byteCharacters.length);
         for (let i = 0; i < byteCharacters.length; i++) {
@@ -210,44 +171,60 @@ export default function DietPage() {
         }
         const byteArray = new Uint8Array(byteNumbers);
         const blob = new Blob([byteArray], { type: 'image/jpeg' });
-        console.log('[DEBUG] blob size:', blob.size, 'bytes');
-        
-        formDataToSend.append('file', blob, 'image.jpg');
-        console.log('[DEBUG] file added to FormData');
-      } else {
-        console.log('[DEBUG] No image to upload');
+
+        const fileFormData = new FormData();
+        fileFormData.append('file', blob, `diet_${Date.now()}.jpg`);
+
+        const fileResponse = await fetch('/api/files', {
+          method: 'POST',
+          headers: {
+            'client-id': 'vitalsense',
+            'Authorization': `Bearer ${currentToken}`
+          },
+          body: fileFormData,
+        });
+
+        const fileData = await fileResponse.json();
+        const fullPath = fileData.path || fileData.item?.[0]?.path || fileData.url;
+        if (fullPath) {
+          imagePath = fullPath.split('/').pop();
+        }
       }
 
-      for (const [key, value] of formDataToSend.entries()) {
-        console.log('[DEBUG] FormData entry:', key, value instanceof Blob ? `Blob(${value.size})` : value);
-      }
-
-      const response = await fetch('/api/posts/with-image', {
+      const response = await fetch(API_URL, {
         method: 'POST',
         headers: {
+          'Content-Type': 'application/json',
           'client-id': 'vitalsense',
           'Authorization': `Bearer ${currentToken}`
         },
-        body: formDataToSend,
+        body: JSON.stringify({
+          type: 'diet',
+          title: `${mealLabels[formData.mealType as MealType]} - ${formData.content.slice(0, 20)}`,
+          content: `측정 일시: ${formData.date}\n${mealLabels[formData.mealType as MealType]}: ${formData.content}`,
+          image: imagePath,
+          extra: { 
+            userId: user?._id, 
+            userName: user?.name,
+            mealType: formData.mealType 
+          },
+        }),
       });
 
-      console.log('[DEBUG] Response status:', response.status);
-      const responseData = await response.json();
-      console.log('[DEBUG] Response data:', responseData);
-
-      setSaved(true);
-      fetchHistory(currentToken);
-      setFormData({
-        date: new Date().toISOString().split('T')[0],
-        mealType: 'breakfast',
-        content: '',
-        image: null,
-      });
-      
-      setTimeout(() => {
-        setSaved(false);
-        setActiveTab('list');
-      }, 1500);
+      if (response.ok) {
+        setSaved(true);
+        fetchHistory(currentToken);
+        setFormData({
+          date: new Date().toISOString().split('T')[0],
+          mealType: 'breakfast',
+          content: '',
+          image: null,
+        });
+        setTimeout(() => {
+          setSaved(false);
+          setActiveTab('list');
+        }, 1500);
+      }
     } catch (error) {
       console.error('Error saving:', error);
     } finally {
@@ -257,10 +234,8 @@ export default function DietPage() {
 
   const handleDelete = async (item: FoodRecord) => {
     if (!confirm('이 기록을 삭제하시겠습니까?')) return;
-
     const currentUser = useAuthStore.getState().user;
     const currentToken = currentUser?.token?.accessToken || currentUser?.accessToken;
-
     if (!currentToken) return;
 
     try {
@@ -271,7 +246,6 @@ export default function DietPage() {
           'Authorization': `Bearer ${currentToken}`
         },
       });
-
       fetchHistory(currentToken);
     } catch (error) {
       console.error('Error deleting:', error);
@@ -284,7 +258,7 @@ export default function DietPage() {
       date: item.date,
       mealType: item.mealType,
       content: content,
-      image: (item as any).image || null,
+      image: item.image || null,
     });
     setEditModal({ open: true, item });
   };
@@ -292,7 +266,6 @@ export default function DietPage() {
   const handleEditImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    
     try {
       const compressed = await compressImage(file);
       setEditForm(prev => ({ ...prev, image: compressed }));
@@ -303,24 +276,16 @@ export default function DietPage() {
 
   const handleUpdate = async () => {
     if (!editModal.item) return;
-    
     const currentUser = useAuthStore.getState().user;
     const currentToken = currentUser?.token?.accessToken || currentUser?.accessToken;
-    
     if (!currentToken) return;
-    
-    try {
-      let imageValue = null;
-      const isNewImage = editForm.image && editForm.image.startsWith('data:image');
-      
-      if (isNewImage) {
-        const postData = {
-          type: 'diet-temp',
-          title: 'temp',
-          content: 'temp',
-        };
 
-        const base64Data = editForm.image.split(',')[1];
+    try {
+      let imageValue = editForm.image;
+      const isNewImage = editForm.image && editForm.image.startsWith('data:image');
+
+      if (isNewImage) {
+        const base64Data = editForm.image!.split(',')[1];
         const byteCharacters = atob(base64Data);
         const byteNumbers = new Array(byteCharacters.length);
         for (let i = 0; i < byteCharacters.length; i++) {
@@ -330,7 +295,7 @@ export default function DietPage() {
         const blob = new Blob([byteArray], { type: 'image/jpeg' });
 
         const uploadFormData = new FormData();
-        uploadFormData.append('post', new Blob([JSON.stringify(postData)], { type: 'application/json' }));
+        uploadFormData.append('post', new Blob([JSON.stringify({ type: 'diet-temp', title: 'temp', content: 'temp' })], { type: 'application/json' }));
         uploadFormData.append('file', blob, 'image.jpg');
 
         const uploadResponse = await fetch('/api/posts/with-image', {
@@ -343,15 +308,10 @@ export default function DietPage() {
         });
 
         const uploadResult = await uploadResponse.json();
-        console.log('[DEBUG] Image upload result:', uploadResult);
-        imageValue = uploadResult.image || null;
-      } else if (editForm.image) {
-        imageValue = (editModal.item as any).image;
+        imageValue = uploadResult.image || uploadResult.path || uploadResult.url || null;
       }
 
-      console.log('[DEBUG] Update: isNewImage:', isNewImage, 'imageValue:', imageValue);
-
-      const response = await fetch(API_URL, {
+      await fetch(API_URL, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -372,10 +332,6 @@ export default function DietPage() {
         }),
       });
 
-      console.log('[DEBUG] Update Response status:', response.status);
-      const responseData = await response.json();
-      console.log('[DEBUG] Update Response data:', responseData);
-      
       setEditModal({ open: false, item: null });
       fetchHistory(currentToken);
     } catch (error) {
@@ -399,30 +355,16 @@ export default function DietPage() {
     <div className="min-h-screen bg-slate-50 text-slate-900 p-4 md:p-8">
       <Header />
       <Navigation />
-
       <main className="max-w-2xl mx-auto mt-6">
-
         <div className="flex bg-white p-1.5 rounded-2xl shadow-sm mb-8 w-fit mx-auto border border-slate-200">
-          <TabButton
-            active={activeTab === 'list'}
-            onClick={() => setActiveTab('list')}
-            icon={<List size={18} />}
-            label="기록 목록"
-          />
-          <TabButton
-            active={activeTab === 'record'}
-            onClick={() => setActiveTab('record')}
-            icon={<Plus size={18} />}
-            label="식사 기록"
-          />
+          <TabButton active={activeTab === 'list'} onClick={() => setActiveTab('list')} icon={<List size={18} />} label="기록 목록" />
+          <TabButton active={activeTab === 'record'} onClick={() => setActiveTab('record')} icon={<Plus size={18} />} label="식사 기록" />
         </div>
 
         {activeTab === 'list' ? (
           <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
             {history.length === 0 ? (
-              <div className="p-8 text-center text-slate-400">
-                기록된 식사 데이터가 없습니다.
-              </div>
+              <div className="p-8 text-center text-slate-400">기록된 식사 데이터가 없습니다.</div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
@@ -444,28 +386,16 @@ export default function DietPage() {
                             {mealLabels[item.mealType as MealType]}
                           </span>
                         </td>
-                        <td className="p-4 text-slate-600">
-                          {item.content.split('\n')[1]?.split(': ')[1] || ''}
-                        </td>
+                        <td className="p-4 text-slate-600">{item.content.split('\n')[1]?.split(': ')[1] || ''}</td>
                         <td className="p-4">
                           {item.image && (
-                            <img src={getImageUrl(item.image)} alt="food" className="w-12 h-12 object-cover rounded-lg" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                            <img src={item.image} alt="food" className="w-12 h-12 object-cover rounded-lg" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
                           )}
                         </td>
                         <td className="p-4">
                           <div className="flex gap-2">
-                            <button
-                              onClick={() => handleEdit(item)}
-                              className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition"
-                            >
-                              <Edit2 size={16} />
-                            </button>
-                            <button
-                              onClick={() => handleDelete(item)}
-                              className="p-2 text-red-400 hover:bg-red-50 rounded-lg transition"
-                            >
-                              <Trash2 size={16} />
-                            </button>
+                            <button onClick={() => handleEdit(item)} className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition"><Edit2 size={16} /></button>
+                            <button onClick={() => handleDelete(item)} className="p-2 text-red-400 hover:bg-red-50 rounded-lg transition"><Trash2 size={16} /></button>
                           </div>
                         </td>
                       </tr>
@@ -478,91 +408,41 @@ export default function DietPage() {
         ) : (
           <div className="bg-white rounded-3xl shadow-xl border border-slate-100 overflow-hidden">
             <div className="bg-gradient-to-r from-green-500 to-emerald-500 p-6 text-white text-center">
-              <h2 className="text-xl font-bold flex items-center justify-center gap-2">
-                <Utensils size={24} /> 식사 기록
-              </h2>
-              <p className="text-sm opacity-90 mt-1">오늘 무엇을 드셨나요?</p>
+              <h2 className="text-xl font-bold flex items-center justify-center gap-2"><Utensils size={24} /> 식사 기록</h2>
             </div>
-
             <form onSubmit={handleSubmit} className="p-8 space-y-5">
               <div className="space-y-2">
-                <label className="text-sm font-bold text-slate-600 flex items-center gap-1">
-                  <Clock size={14} /> 날짜
-                </label>
-                <input
-                  type="date"
-                  className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-green-500"
-                  value={formData.date}
-                  onChange={(e) => setFormData({...formData, date: e.target.value})}
-                />
+                <label className="text-sm font-bold text-slate-600 flex items-center gap-1"><Clock size={14} /> 날짜</label>
+                <input type="date" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-green-500" value={formData.date} onChange={(e) => setFormData({...formData, date: e.target.value})} />
               </div>
-
               <div className="space-y-2">
                 <label className="text-sm font-bold text-slate-600">식사 유형</label>
                 <div className="grid grid-cols-4 gap-2">
                   {(['breakfast', 'lunch', 'dinner', 'other'] as MealType[]).map((type) => (
-                    <button
-                      key={type}
-                      type="button"
-                      onClick={() => setFormData({...formData, mealType: type})}
-                      className={`p-3 rounded-xl text-sm font-bold transition ${
-                        formData.mealType === type
-                          ? mealColors[type]
-                          : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                      }`}
-                    >
-                      {mealLabels[type]}
-                    </button>
+                    <button key={type} type="button" onClick={() => setFormData({...formData, mealType: type})} className={`p-3 rounded-xl text-sm font-bold transition ${formData.mealType === type ? mealColors[type] : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>{mealLabels[type]}</button>
                   ))}
                 </div>
               </div>
-
               <div className="space-y-2">
                 <label className="text-sm font-bold text-slate-600">메뉴</label>
-                <textarea
-                  placeholder="예: 삼겹살, 채소 소스, 밥 한 공기"
-                  className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 resize-none h-24"
-                  value={formData.content}
-                  onChange={(e) => setFormData({...formData, content: e.target.value})}
-                />
+                <textarea placeholder="예: 삼겹살, 채소 소스, 밥 한 공기" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 h-24" value={formData.content} onChange={(e) => setFormData({...formData, content: e.target.value})} />
               </div>
-
               <div className="space-y-2">
-                <label className="text-sm font-bold text-slate-600 flex items-center gap-1">
-                  <Camera size={14} /> 사진 업로드
-                </label>
+                <label className="text-sm font-bold text-slate-600 flex items-center gap-1"><Camera size={14} /> 사진 업로드</label>
                 <div className="flex items-center gap-4">
                   <label className="flex items-center gap-2 px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-100 transition">
-                    <ImagePlus size={20} className="text-slate-500" />
-                    <span className="text-sm text-slate-600">사진 선택</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={handleImageChange}
-                    />
+                    <ImagePlus size={20} className="text-slate-500" /><span className="text-sm text-slate-600">사진 선택</span>
+                    <input type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
                   </label>
                   {formData.image && (
                     <div className="relative">
                       <img src={formData.image} alt="preview" className="w-16 h-16 object-cover rounded-lg" />
-                      <button
-                        type="button"
-                        onClick={() => setFormData(prev => ({ ...prev, image: null }))}
-                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1"
-                      >
-                        <X size={12} />
-                      </button>
+                      <button type="button" onClick={() => setFormData(prev => ({ ...prev, image: null }))} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1"><X size={12} /></button>
                     </div>
                   )}
                 </div>
-                <p className="text-xs text-slate-400">100KB 이하로 자동 압축됩니다</p>
               </div>
-
-              <button
-                type="submit"
-                disabled={loading || !formData.content.trim()}
-                className="w-full py-4 bg-green-500 text-white font-bold rounded-2xl hover:bg-green-600 transition disabled:opacity-50"
-              >
+              <button type="submit" disabled={loading || !formData.content.trim()} className="w-full py-4 bg-green-500 text-white font-bold rounded-2xl hover:bg-green-600 transition disabled:opacity-50">
                 {saved ? '저장됨!' : loading ? '저장 중...' : '저장'}
               </button>
             </form>
@@ -574,83 +454,41 @@ export default function DietPage() {
             <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden">
               <div className="p-4 border-b flex justify-between items-center">
                 <h3 className="font-bold">식단 기록 수정</h3>
-                <button onClick={() => setEditModal({open: false, item: null})} className="p-2 hover:bg-slate-100 rounded-full">
-                  <X size={20} />
-                </button>
+                <button onClick={() => setEditModal({open: false, item: null})} className="p-2 hover:bg-slate-100 rounded-full"><X size={20} /></button>
               </div>
               <div className="p-6 space-y-4">
                 <div className="space-y-2">
                   <label className="text-sm font-bold text-slate-600">날짜</label>
-                  <input
-                    type="date"
-                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-green-500"
-                    value={editForm.date}
-                    onChange={(e) => setEditForm({...editForm, date: e.target.value})}
-                  />
+                  <input type="date" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl" value={editForm.date} onChange={(e) => setEditForm({...editForm, date: e.target.value})} />
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-bold text-slate-600">식사 유형</label>
                   <div className="grid grid-cols-4 gap-2">
                     {(['breakfast', 'lunch', 'dinner', 'other'] as MealType[]).map((type) => (
-                      <button
-                        key={type}
-                        type="button"
-                        onClick={() => setEditForm({...editForm, mealType: type})}
-                        className={`p-2 rounded-xl text-sm font-bold transition ${
-                          editForm.mealType === type
-                            ? mealColors[type]
-                            : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                        }`}
-                      >
-                        {mealLabels[type]}
-                      </button>
+                      <button key={type} type="button" onClick={() => setEditForm({...editForm, mealType: type})} className={`p-2 rounded-xl text-sm font-bold transition ${editForm.mealType === type ? mealColors[type] : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>{mealLabels[type]}</button>
                     ))}
                   </div>
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-bold text-slate-600">메뉴</label>
-                  <textarea
-                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-green-500 resize-none h-20"
-                    value={editForm.content}
-                    onChange={(e) => setEditForm({...editForm, content: e.target.value})}
-                  />
+                  <textarea className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl h-20" value={editForm.content} onChange={(e) => setEditForm({...editForm, content: e.target.value})} />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-600 flex items-center gap-1">
-                    <Camera size={14} /> 사진 변경
-                  </label>
+                  <label className="text-sm font-bold text-slate-600 flex items-center gap-1"><Camera size={14} /> 사진 변경</label>
                   <div className="flex items-center gap-4">
                     <label className="flex items-center gap-2 px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-100 transition">
-                      <ImagePlus size={20} className="text-slate-500" />
-                      <span className="text-sm text-slate-600">사진 선택</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={handleEditImageChange}
-                      />
+                      <ImagePlus size={20} className="text-slate-500" /><span className="text-sm text-slate-600">사진 선택</span>
+                      <input type="file" accept="image/*" className="hidden" onChange={handleEditImageChange} />
                     </label>
                     {editForm.image && (
                       <div className="relative">
                         <img src={editForm.image} alt="preview" className="w-16 h-16 object-cover rounded-lg" />
-                        <button
-                          type="button"
-                          onClick={() => setEditForm(prev => ({ ...prev, image: null }))}
-                          className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1"
-                        >
-                          <X size={12} />
-                        </button>
+                        <button type="button" onClick={() => setEditForm(prev => ({ ...prev, image: null }))} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1"><X size={12} /></button>
                       </div>
                     )}
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={handleUpdate}
-                  className="w-full py-3 bg-green-500 text-white font-bold rounded-xl hover:bg-green-600 transition"
-                >
-                  수정하기
-                </button>
+                <button type="button" onClick={handleUpdate} className="w-full py-3 bg-green-500 text-white font-bold rounded-xl hover:bg-green-600 transition">수정하기</button>
               </div>
             </div>
           </div>

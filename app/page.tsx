@@ -172,7 +172,7 @@ useEffect(() => {
             <HealthCard 
               title="혈압" 
               value={healthData.bp.value || '기록없음'} 
-              unit="mmHg" 
+              unit="" 
               icon={<Heart className="text-red-500 w-4 h-4 sm:w-5 sm:h-5" />} 
               status={healthData.bp.status || ''} 
               href="/blood-pressure"
@@ -181,7 +181,7 @@ useEffect(() => {
             <HealthCard 
               title="혈당" 
               value={healthData.sugar.value || '기록없음'} 
-              unit="mg/dL" 
+              unit="" 
               icon={<Droplets className="text-blue-500 w-4 h-4 sm:w-5 sm:h-5" />} 
               status={healthData.sugar.status || ''} 
               color="text-orange-500"
@@ -191,7 +191,7 @@ useEffect(() => {
             <HealthCard 
               title="BMI" 
               value={healthData.bmi.value || '기록없음'} 
-              unit="Index" 
+              unit="" 
               icon={<Activity className="text-purple-500 w-4 h-4 sm:w-5 sm:h-5" />} 
               status={healthData.bmi.status || ''}
               href="/bmi"
