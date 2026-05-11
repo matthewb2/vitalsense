@@ -17,6 +17,8 @@ export default function HealthDashboard() {
     sugar: { value: '', status: '' },
     bmi: { value: '', status: '' },
   });
+  const [todayDiet, setTodayDiet] = useState<any[]>([]);
+  const [todayExercise, setTodayExercise] = useState<any[]>([]);
 
   useEffect(() => {
     setMounted(true);
@@ -52,7 +54,7 @@ useEffect(() => {
 
         console.log('[DEBUG]Fetching health data...');
 
-        const [bpRes, sugarRes, bmiRes] = await Promise.all([
+        const [bpRes, sugarRes, bmiRes, dietRes, exerciseRes] = await Promise.all([
           fetch('/api/posts/users?type=bp&limit=100', {
             headers: { 'Authorization': `Bearer ${currentToken}` }
           }),
@@ -62,11 +64,37 @@ useEffect(() => {
           fetch('/api/posts/users?type=bmi&limit=100', {
             headers: { 'Authorization': `Bearer ${currentToken}` }
           }),
+          fetch('/api/posts/users?type=diet&limit=100', {
+            headers: { 'Authorization': `Bearer ${currentToken}` }
+          }),
+          fetch('/api/posts/users?type=exercise&limit=100', {
+            headers: { 'Authorization': `Bearer ${currentToken}` }
+          }),
         ]);
 
         const bpData = await bpRes.json();
         const sugarData = await sugarRes.json();
         const bmiData = await bmiRes.json();
+        const dietData = await dietRes.json();
+        const exerciseData = await exerciseRes.json();
+
+        const today = new Date().toISOString().split('T')[0];
+        
+        const allDietItems = dietData.item || [];
+        const todayDietItems = allDietItems.filter((item: any) => 
+          item.content && item.content.includes(`측정 일시: ${today}`)
+        );
+        
+        const allExerciseItems = exerciseData.item || [];
+        const todayExerciseItems = allExerciseItems.filter((item: any) => 
+          item.content && item.content.includes(`측정 일시: ${today}`)
+        );
+        
+        console.log('[DEBUG] todayDietItems:', todayDietItems);
+        console.log('[DEBUG] todayExerciseItems:', todayExerciseItems);
+        
+        setTodayDiet(todayDietItems);
+        setTodayExercise(todayExerciseItems);
 
         console.log('[DEBUG] BP Response:', bpData);
         console.log('[DEBUG] Sugar Response:', sugarData);
@@ -144,7 +172,7 @@ useEffect(() => {
             <HealthCard 
               title="혈압" 
               value={healthData.bp.value || '기록없음'} 
-              unit="mmHg" 
+              unit="" 
               icon={<Heart className="text-red-500 w-4 h-4 sm:w-5 sm:h-5" />} 
               status={healthData.bp.status || ''} 
               href="/blood-pressure"
@@ -153,7 +181,7 @@ useEffect(() => {
             <HealthCard 
               title="혈당" 
               value={healthData.sugar.value || '기록없음'} 
-              unit="mg/dL" 
+              unit="" 
               icon={<Droplets className="text-blue-500 w-4 h-4 sm:w-5 sm:h-5" />} 
               status={healthData.sugar.status || ''} 
               color="text-orange-500"
@@ -163,7 +191,7 @@ useEffect(() => {
             <HealthCard 
               title="BMI" 
               value={healthData.bmi.value || '기록없음'} 
-              unit="Index" 
+              unit="" 
               icon={<Activity className="text-purple-500 w-4 h-4 sm:w-5 sm:h-5" />} 
               status={healthData.bmi.status || ''}
               href="/bmi"
@@ -177,14 +205,74 @@ useEffect(() => {
               <Utensils size={20} /> 오늘 하루 기록
             </h3>
             <div className="space-y-4">
-              <div className="flex justify-between items-center p-3 bg-slate-50 rounded-lg">
-                <span>아침: 닭가슴살 샐러드, 현미밥</span>
-                <span className="text-sm text-slate-400">08:30</span>
-              </div>
-              <div className="flex justify-between items-center p-3 bg-slate-50 rounded-lg">
-                <span>운동: 인터벌 러닝 30분</span>
-                <span className="text-sm text-blue-500 font-medium">-420 kcal</span>
-              </div>
+              {todayDiet.length === 0 ? (
+                <Link href="/diet" className="block">
+                  <div className="flex justify-between items-center p-3 bg-slate-50 rounded-lg cursor-pointer hover:bg-slate-100 transition">
+                    <span className="text-slate-400">식단: 기록없음</span>
+                    <span className="text-sm text-blue-500">기록하기</span>
+                  </div>
+                </Link>
+              ) : (
+                <Link href="/diet" className="block">
+                  <div className="space-y-2">
+                    {todayDiet.map((item, i) => {
+                      let mealType = item.extra?.mealType;
+                      if (!mealType && item.title) {
+                        if (item.title.startsWith('아침')) mealType = 'breakfast';
+                        else if (item.title.startsWith('점심')) mealType = 'lunch';
+                        else if (item.title.startsWith('저녁')) mealType = 'dinner';
+                      }
+                      const mealLabel = { breakfast: '아침', lunch: '점심', dinner: '저녁', other: '기타' }[mealType] || '기타';
+                      const content = item.content.split('\n')[1]?.split(': ')[1] || '';
+                      return (
+                        <div key={i} className="flex justify-between items-center p-3 bg-slate-50 rounded-lg cursor-pointer hover:bg-slate-100 transition">
+                          <span>{mealLabel}: {content}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </Link>
+              )}
+
+              {todayExercise.length === 0 ? (
+                <Link href="/exercise" className="block">
+                  <div className="flex justify-between items-center p-3 bg-slate-50 rounded-lg cursor-pointer hover:bg-slate-100 transition">
+                    <span className="text-slate-400">운동: 기록없음</span>
+                    <span className="text-sm text-orange-500">기록하기</span>
+                  </div>
+                </Link>
+              ) : (
+                <Link href="/exercise" className="block">
+                  <div className="space-y-2">
+                    {todayExercise.map((item, i) => {
+                      let exerciseType = item.extra?.exerciseType;
+                      let duration = item.extra?.duration;
+                      let calories = item.extra?.calories ? ` -${item.extra.calories}kcal` : '';
+                      
+                      if (!exerciseType && item.title) {
+                        if (item.title.startsWith('러닝')) exerciseType = 'running';
+                        else if (item.title.startsWith('걷기')) exerciseType = 'walking';
+                        else if (item.title.startsWith('수영')) exerciseType = 'swimming';
+                        else if (item.title.startsWith('자전거')) exerciseType = 'cycling';
+                        else if (item.title.startsWith('헬스')) exerciseType = 'weight';
+                        else if (item.title.startsWith('요가')) exerciseType = 'yoga';
+                      }
+                      
+                      if (!duration && item.title) {
+                        const durationMatch = item.title.match(/(\d+)분/);
+                        if (durationMatch) duration = durationMatch[1];
+                      }
+                      
+                      const exerciseLabel = { running: '러닝', walking: '걷기', swimming: '수영', cycling: '자전거', weight: '헬스', yoga: '요가', other: '기타' }[exerciseType] || '기타';
+                      return (
+                        <div key={i} className="flex justify-between items-center p-3 bg-slate-50 rounded-lg cursor-pointer hover:bg-slate-100 transition">
+                          <span>운동: {exerciseLabel} {duration ? `${duration}분` : ''}{calories}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </Link>
+              )}
             </div>
           </div>
         </div>

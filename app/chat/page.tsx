@@ -6,6 +6,7 @@ import { Send } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { useAuthStore } from '@/store/authStore';
 import Header from '@/components/ChatHeader';
+import Navigation from '@/components/Navigation';
 
 const initialMessages = [
   { role: 'ai', content: '안녕하세요! 저는 바이탈센스 에이전트입니다. 건강에 관한 무엇이든 물어보세요. 혈당, 혈압, 식단, 운동 등 다양한 건강 정보를 알려드릴 수 있습니다.' }
@@ -86,6 +87,7 @@ function ChatContent() {
   return (
     <div className="min-h-screen bg-white flex flex-col">
       <Header />
+      <Navigation />
 
       {/* 채팅 영역 - 전체 화면 */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
@@ -97,7 +99,7 @@ function ChatContent() {
                 : 'bg-slate-100 text-slate-800'
             }`}>
               {msg.role === 'user' ? msg.content : (
-                <div className="prose prose-sm max-w-none">
+                <div className="prose prose-lg max-w-none">
                   <ReactMarkdown>{msg.content}</ReactMarkdown>
                 </div>
               )}

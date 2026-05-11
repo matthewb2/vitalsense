@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Header from '../components/Header';
+import Navigation from '@/components/Navigation';
 import { Activity, Calculator, Ruler, Scale, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useAuthStore } from '@/store/authStore';
@@ -166,17 +167,14 @@ export default function BmiPage() {
   };
 
   const bmiStatus = calculatedBmi ? getBmiStatus(calculatedBmi) : null;
-  const latestHistory = history[0];
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 p-4 md:p-8">
       <Header />
+      <Navigation />
 
       <main className="max-w-2xl mx-auto mt-6">
-        <Link href="/" className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-700 mb-4">
-          <ArrowLeft size={20} /> 메인으로
-        </Link>
-
+        
         <div className="bg-white rounded-3xl shadow-xl border border-slate-100 overflow-hidden">
           <div className="bg-gradient-to-r from-purple-500 to-indigo-500 p-6 text-white text-center">
             <h2 className="text-xl font-bold flex items-center justify-center gap-2">
@@ -251,25 +249,31 @@ export default function BmiPage() {
         </div>
 
         {history.length > 0 && (
-          <div className="mt-6 bg-white rounded-3xl shadow-sm border border-slate-100 p-6">
-            <h3 className="font-bold flex items-center gap-2 mb-4"><Activity size={18} className="text-purple-500" /> 최근 기록</h3>
-            <div className="flex justify-between items-center text-sm">
-              <div>
-                <p className="text-slate-500">신장</p>
-                <p className="font-bold">{latestHistory.height} cm</p>
-              </div>
-              <div>
-                <p className="text-slate-500">체중</p>
-                <p className="font-bold">{latestHistory.weight} kg</p>
-              </div>
-              <div>
-                <p className="text-slate-500">BMI</p>
-                <p className="font-bold text-purple-600">{latestHistory.bmi}</p>
-              </div>
-              <div>
-                <p className="text-slate-500">날짜</p>
-                <p className="font-bold">{latestHistory.date}</p>
-              </div>
+          <div className="mt-6 bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+            <div className="p-4 bg-slate-50 border-b border-slate-100">
+              <h3 className="font-bold flex items-center gap-2"><Activity size={18} className="text-purple-500" /> BMI 기록 목록</h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-slate-50 text-slate-500 font-medium">
+                  <tr>
+                    <th className="p-4">날짜</th>
+                    <th className="p-4">신장</th>
+                    <th className="p-4">체중</th>
+                    <th className="p-4">BMI</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {history.map((item) => (
+                    <tr key={item._id} className="hover:bg-slate-50/50 transition">
+                      <td className="p-4 font-medium">{item.date}</td>
+                      <td className="p-4">{item.height} cm</td>
+                      <td className="p-4">{item.weight} kg</td>
+                      <td className="p-4 text-purple-600 font-bold">{item.bmi}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         )}
