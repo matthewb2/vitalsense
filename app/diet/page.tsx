@@ -5,6 +5,7 @@ import Header from '../components/Header';
 import Navigation from '@/components/Navigation';
 import { Utensils, Clock, Plus, List, Trash2, Edit2, X, ImagePlus, Camera, Loader2 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
+import Image from 'next/image';
 
 const API_URL = '/api/posts';
 const IMAGE_HOST_URL = 'http://mksolution.dothome.co.kr/images';
@@ -483,7 +484,7 @@ export default function DietPage() {
                         <td className="p-4 text-slate-600 truncate max-w-[150px]">{item.content.split('\n')[1]?.split(': ')[1] || ''}</td>
                         <td className="p-4">
                           {item.image && (
-                            <img src={item.image} alt="food" className="w-12 h-12 object-cover rounded-lg border" />
+                            <Image src={item.image} alt="food" width={48} height={48} className="w-12 h-12 object-cover rounded-lg border" />
                           )}
                         </td>
                         <td className="p-4">
