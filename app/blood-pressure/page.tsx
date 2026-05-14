@@ -239,7 +239,7 @@ try {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 p-4 md:p-8">
+    <div className="min-h-screen bg-slate-50 text-slate-900 ">
       <Header />
       <Navigation />
 

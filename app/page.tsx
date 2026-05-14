@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Activity, Heart, Droplets, Utensils, Search } from 'lucide-react';
-import Header from './components/Header';
+import Header from '@/app/components/Header';
 import { useAuthStore } from '@/store/authStore';
 
 export default function HealthDashboard() {
@@ -161,10 +161,10 @@ useEffect(() => {
   }, [isLoggedIn, user]);
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 p-4 md:p-8">
+    <div className="min-h-screen bg-slate-50 text-slate-900 ">
       <Header />
 
-      <main className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <main className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8 p-4">
         
         {/* 왼쪽: 생체 지표 카드 섹션 */}
 <div className="lg:col-span-2 space-y-6">
