@@ -131,8 +131,7 @@ export default function BloodSugarPage() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 ">
       <Header />
-      <Navigation />
-
+      
       <main className="max-w-4xl mx-auto mt-6">
         <div className="flex bg-white p-1.5 rounded-2xl shadow-sm mb-8 w-fit mx-auto border border-slate-200">
           <TabButton 

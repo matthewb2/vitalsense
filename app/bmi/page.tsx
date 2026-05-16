@@ -171,8 +171,7 @@ export default function BmiPage() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 ">
       <Header />
-      <Navigation />
-
+      
       <main className="max-w-2xl mx-auto mt-6">
         <Link href="/" className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-700 mb-4">
           <ArrowLeft size={20} /> 메인으로

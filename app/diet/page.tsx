@@ -448,7 +448,7 @@ export default function DietPage() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 p-4 md:p-8">
       <Header />
-      <Navigation />
+      
       <main className="max-w-2xl mx-auto mt-6">
         <div className="flex bg-white p-1.5 rounded-2xl shadow-sm mb-8 w-fit mx-auto border border-slate-200">
           <TabButton active={activeTab === 'list'} onClick={() => setActiveTab('list')} icon={<List size={18} />} label="기록 목록" />
@@ -462,7 +462,7 @@ export default function DietPage() {
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
-                  <thead className="bg-slate-50 text-slate-500 font-medium">
+                  <thead className="bg-slate-50 text-slate-500 font-medium text-[0.7rem]">
                     <tr>
                       <th className="p-4">날짜</th>
                       <th className="p-4">식사</th>
@@ -475,13 +475,13 @@ export default function DietPage() {
                     {history.map((item) => (
                       <tr key={item._id} className="hover:bg-slate-50/50 transition">
                         <td className="p-4 font-medium">{item.date}</td>
-                        <td className="p-4">
-                          <span className={`px-3 py-1 rounded-full text-xs font-bold ${mealColors[item.mealType]}`}>
+                        <td className="p-4 min-w-[60px]">
+                          <span className={`px-1 py-1 rounded-full text-[0.6rem] font-bold ${mealColors[item.mealType]}`}>
                             {mealLabels[item.mealType]}
                           </span>
                         </td>
                         <td className="p-4 text-slate-600 truncate max-w-[150px]">{item.content.split('\n')[1]?.split(': ')[1] || ''}</td>
-                        <td className="p-4">
+                        <td className="p-4 min-w-[80px]">
                           {item.image && (
                             <img src={item.image} alt="food" className="w-12 h-12 object-cover rounded-lg border" />
                           )}
