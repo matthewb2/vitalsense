@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useState, useRef, useEffect, Suspense } from 'react';
+import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Send } from 'lucide-react';
+import { Send, History } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { useAuthStore } from '@/store/authStore';
 import Header from '@/app/components/Header';
@@ -19,9 +20,9 @@ function ChatContent() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [chatHistory, setChatHistory] = useState<any[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  
-  
 
   useEffect(() => {
     setMounted(true);
@@ -38,8 +39,40 @@ function ChatContent() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, loading]);
 
+  const fetchChatHistory = async () => {
+    const currentToken = user?.token?.accessToken || user?.accessToken;
+    if (!currentToken) return;
+    
+    try {
+      const response = await fetch('/api/posts?type=chat&sort=_id,-1', {
+        headers: {
+          'client-id': 'vitalsense',
+          'Authorization': `Bearer ${currentToken}`
+        }
+      });
+      const data = await response.json();
+      if (data.ok && data.item) {
+        const userId = user?._id;
+        const filtered = data.item.filter((item: any) => item.user?._id === userId);
+        setChatHistory(filtered);
+      }
+    } catch (err) {
+      console.error('Error fetching chat history:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (mounted && isLoggedIn) {
+      fetchChatHistory();
+    }
+  }, [mounted, isLoggedIn]);
+
+  const handleHistoryClick = (content: string) => {
+    setInput(content);
+    setShowHistory(false);
+  };
+
   const handleSendMessage = async () => {
-	
     if (!input.trim() || loading) return;
     
     const userMessage = input.trim();
@@ -57,7 +90,13 @@ function ChatContent() {
       });
       
       const data = await response.json();
-      setMessages([...newMessages, { role: 'ai', content: data.content }]);
+      console.log('[Chat] Response:', data);
+      
+      if (!response.ok || data.error) {
+        setMessages([...newMessages, { role: 'ai', content: data.error || '오류가 발생했습니다.' }]);
+      } else {
+        setMessages([...newMessages, { role: 'ai', content: data.content }]);
+      }
 
       const currentToken = user?.token?.accessToken || user?.accessToken;
       if (currentToken) {
@@ -75,6 +114,7 @@ function ChatContent() {
             extra: { userId: user?._id, userName: user?.name }
           }),
         });
+        fetchChatHistory();
       }
     } catch (error) {
       console.error('Chat error:', error);
@@ -87,6 +127,35 @@ function ChatContent() {
     <div className="min-h-screen bg-white flex flex-col">
       <Header title="바이탈센스 AI" />
       
+      {/* 히스토리 패널 */}
+      {showHistory && (
+        <div className="fixed inset-0 bg-white z-50 overflow-y-auto">
+          <div className="p-4">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-bold">이전 질문 목록</h2>
+              <button onClick={() => setShowHistory(false)} className="p-2 hover:bg-slate-100 rounded-full">
+                ✕
+              </button>
+            </div>
+            {chatHistory.length === 0 ? (
+              <p className="text-slate-500 text-center py-8">이전 질문이 없습니다.</p>
+            ) : (
+              <div className="space-y-2">
+                {chatHistory.map((item, i) => (
+                  <div 
+                    key={i} 
+                    onClick={() => handleHistoryClick(item.content)}
+                    className="p-3 bg-slate-50 rounded-lg hover:bg-slate-100 cursor-pointer"
+                  >
+                    <p className="text-sm text-slate-700 line-clamp-2">{item.content}</p>
+                    <p className="text-xs text-slate-400 mt-1">{item.createdAt?.split('T')[0] || ''}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* 채팅 영역 - 전체 화면 */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
@@ -118,6 +187,13 @@ function ChatContent() {
       {/* 하단 입력창 */}
       <div className="sticky bottom-0 bg-white border-t px-4 py-4">
         <div className="max-w-3xl mx-auto flex items-center gap-2">
+          <button 
+            onClick={() => { fetchChatHistory(); setShowHistory(true); }}
+            className="p-4 text-slate-500 hover:text-blue-600 hover:bg-slate-100 rounded-2xl transition"
+            title="이전 질문 보기"
+          >
+            <History size={20} />
+          </button>
           <input 
             type="text"
             value={input}
