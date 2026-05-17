@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, Suspense } from 'react';
 import Header from '../components/Header';
-import { HeartPulse, Mail, Lock, Eye, EyeOff, ArrowLeft } from 'lucide-react';
+import { HeartPulse, Mail, Lock, Eye, EyeOff, ArrowLeft, Loader2 } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuthStore } from '@/store/authStore';
@@ -184,7 +184,15 @@ const data = await response.json();
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 p-4">
+    <div className="min-h-screen bg-slate-50 text-slate-900 p-4 relative">
+      {loading && (
+        <div className="absolute inset-0 bg-white/80 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="flex flex-col items-center gap-4">
+            <Loader2 className="animate-spin text-blue-600" size={48} />
+            <p className="text-slate-600 font-medium">로그인 중...</p>
+          </div>
+        </div>
+      )}
       <Header />
 
       <main className="max-w-md mx-auto mt-10">

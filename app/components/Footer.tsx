@@ -26,11 +26,7 @@ export default function Footer() {
             <span className="text-slate-300">|</span>
             <Link href="/privacy" className="text-slate-500 hover:text-blue-600 transition-colors">
               개인정보처리방침
-            </Link>
-            <span className="text-slate-300">|</span>
-            <Link href="/location" className="text-slate-500 hover:text-blue-600 transition-colors">
-              위치정보서비스
-            </Link>
+            </Link>            
           </div>
 
           <div className="text-xs text-slate-400">

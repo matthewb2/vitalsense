@@ -446,7 +446,7 @@ export default function DietPage() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 p-4 md:p-8">
+    <div className="min-h-screen bg-slate-50 text-slate-900">
       <Header />
       
       <main className="max-w-2xl mx-auto mt-6">

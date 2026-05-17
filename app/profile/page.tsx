@@ -2,12 +2,12 @@
 
 import React, { useEffect } from 'react';
 import Header from '../components/Header';
-import { User, Mail, Pencil, ArrowLeft, Calendar } from 'lucide-react';
+import { User, Mail, Pencil, ArrowLeft, Calendar, LogOut } from 'lucide-react';
 import Link from 'next/link';
 import { useAuthStore } from '@/store/authStore';
 
 export default function ProfilePage() {
-  const { user, checkAuth } = useAuthStore();
+  const { user, checkAuth, logout } = useAuthStore();
 
   useEffect(() => {
     checkAuth();
@@ -18,8 +18,13 @@ export default function ProfilePage() {
     return birthday;
   };
 
+  const handleLogout = () => {
+    logout();
+    window.location.href = '/';
+  };
+
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 p-4 md:p-8">
+    <div className="min-h-screen bg-slate-50 text-slate-900">
       <Header />
 
       <main className="max-w-md mx-auto">
@@ -82,6 +87,14 @@ export default function ProfilePage() {
             </div>
           </div>
         </div>
+
+        <button 
+          onClick={handleLogout}
+          className="w-full mt-6 py-3 px-4 bg-red-50 text-red-600 rounded-xl font-bold hover:bg-red-100 transition flex items-center justify-center gap-2"
+        >
+          <LogOut size={20} />
+          로그아웃
+        </button>
       </main>
     </div>
   );
