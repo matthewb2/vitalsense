@@ -22,11 +22,8 @@ function LoginForm() {
   useEffect(() => {
     const oauth = searchParams.get('oauth');
     
-    console.log('Session status:', status, 'session:', session, 'oauth:', oauth);
-    
     if (status === 'authenticated' && session?.user && oauth === 'google') {
       const user = session.user as any;
-      console.log('Google login detected:', user);
       
       const providerAccountId = user.providerAccountId || user.sub;
       const googleEmail = user.email;
@@ -40,7 +37,7 @@ function LoginForm() {
   }, [status, session, searchParams]);
 
   const processGoogleLogin = async (googleEmail: string | null, googleName: string | null, googleImage: string | null, providerAccountId: string) => {
-    console.log('Processing Google login:', { providerAccountId, googleEmail, googleName });
+    setLoading(true);
     
     try {
       const response = await fetch('/api/auth/oauth-login', {
@@ -76,7 +73,7 @@ const data = await response.json();
            },
          };
          setUser(userData);
-         alert('로그인 성공!');
+         //alert('로그인 성공!');
          router.push('/');
       } else {
         const params = new URLSearchParams({
@@ -98,9 +95,7 @@ const data = await response.json();
     
     if (oauth === 'success' && userParam) {
       try {
-        console.log('Raw userParam:', userParam);
         const userData = JSON.parse(userParam);
-        console.log('OAuth success! User data:', userData);
         
         // Token exists → existing user → login success
         if (userData.accessToken || userData.token) {
@@ -124,7 +119,6 @@ const data = await response.json();
         }
         return;
       } catch (err) {
-        console.error('OAuth user parse error:', err);
         setError('로그인 데이터 처리 중 오류');
       }
     }
@@ -149,13 +143,11 @@ const data = await response.json();
       const data = await response.json();
 
       if (data.ok) {
-        console.log('Login API response:', data);
         const userData = {
           ...data.item,
           token: data.item?.token,
           accessToken: data.item?.token?.accessToken,
         };
-        console.log('User data to save:', userData);
         setUser(userData);
         router.push('/');
       } else {
@@ -169,17 +161,16 @@ const data = await response.json();
   };
 
   const handleGoogleLogin = async () => {
-    console.log('Starting Google OAuth...');
+    setLoading(true);
     
     if (status === 'authenticated') {
-      console.log('Signing out existing session first...');
       await signOut({ redirect: false });
     }
     
     const result = await signIn('google', { callbackUrl: '/login?oauth=google' });
     if (result?.error) {
-      console.error('Sign in error:', result.error);
       setError('Google 로그인에 실패했습니다.');
+      setLoading(false);
     }
   };
 

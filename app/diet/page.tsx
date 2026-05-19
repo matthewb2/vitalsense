@@ -1,9 +1,11 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import Image from 'next/image'
 import Header from '../components/Header';
 import Navigation from '@/components/Navigation';
-import { Utensils, Clock, Plus, List, Trash2, Edit2, X, ImagePlus, Camera, Loader2 } from 'lucide-react';
+import DietEditModal from '../components/DietEditModal';
+import { Utensils, Clock, Plus, List, Trash2, Edit2, X, ImagePlus, Camera, Loader2, Flame } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 
 const API_URL = '/api/posts';
@@ -45,6 +47,7 @@ export default function DietPage() {
   const { user, checkAuth } = useAuthStore();
   const [activeTab, setActiveTab] = useState<'record' | 'list'>('list');
   const [loading, setLoading] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [saved, setSaved] = useState(false);
   const [history, setHistory] = useState<FoodRecord[]>([]);
   const [formData, setFormData] = useState({
@@ -145,7 +148,7 @@ export default function DietPage() {
       const reader = new FileReader();
       reader.readAsDataURL(file);
       reader.onload = (event) => {
-        const img = new Image();
+        const img = new window.Image();
         img.src = event.target?.result as string;
         img.onload = () => {
           const canvas = document.createElement('canvas');
@@ -201,6 +204,7 @@ export default function DietPage() {
   }, [user?._id, user?.token]);
 
   const fetchHistory = async (token: string) => {
+    setHistoryLoading(true);
     try {
       const response = await fetch(`${API_URL}?type=diet`, {
         method: 'GET',
@@ -233,6 +237,8 @@ export default function DietPage() {
       }
     } catch (err) {
       console.error('Error fetching history:', err);
+    } finally {
+      setHistoryLoading(false);
     }
   };
 
@@ -449,53 +455,54 @@ export default function DietPage() {
     <div className="min-h-screen bg-slate-50 text-slate-900">
       <Header />
       
-      <main className="max-w-2xl mx-auto mt-6">
-        <div className="flex bg-white p-1.5 rounded-2xl shadow-sm mb-8 w-fit mx-auto border border-slate-200">
+      <main className="max-w-md mx-auto mt-4">
+        <div className="flex bg-white p-1.5 rounded-2xl shadow-sm mb-4 border border-slate-200">
           <TabButton active={activeTab === 'list'} onClick={() => setActiveTab('list')} icon={<List size={18} />} label="기록 목록" />
           <TabButton active={activeTab === 'record'} onClick={() => setActiveTab('record')} icon={<Plus size={18} />} label="식사 기록" />
         </div>
 
         {activeTab === 'list' ? (
-          <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
-            {history.length === 0 ? (
+          <div className="space-y-4">
+            {historyLoading ? (
+              <div className="p-8 text-center text-slate-400 flex items-center justify-center gap-2">
+                <Loader2 className="animate-spin" size={20} /> 데이터를 가져오는 중...
+              </div>
+            ) : history.length === 0 ? (
               <div className="p-8 text-center text-slate-400">기록된 식사 데이터가 없습니다.</div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead className="bg-slate-50 text-slate-500 font-medium text-[0.7rem]">
-                    <tr>
-                      <th className="p-4">날짜</th>
-                      <th className="p-4">식사</th>
-                      <th className="p-4">메뉴</th>
-                      <th className="p-4">사진</th>
-                      <th className="p-4">관리</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50">
-                    {history.map((item) => (
-                      <tr key={item._id} className="hover:bg-slate-50/50 transition">
-                        <td className="p-4 font-medium">{item.date}</td>
-                        <td className="p-4 min-w-[60px]">
-                          <span className={`px-1 py-1 rounded-full text-[0.6rem] font-bold ${mealColors[item.mealType]}`}>
-                            {mealLabels[item.mealType]}
-                          </span>
-                        </td>
-                        <td className="p-4 text-slate-600 truncate max-w-[150px]">{item.content.split('\n')[1]?.split(': ')[1] || ''}</td>
-                        <td className="p-4 min-w-[80px]">
-                          {item.image && (
-                            <img src={item.image} alt="food" className="w-12 h-12 object-cover rounded-lg border" />
-                          )}
-                        </td>
-                        <td className="p-4">
-                          <div className="flex gap-2">
-                            <button onClick={() => handleEdit(item)} className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition"><Edit2 size={16} /></button>
-                            <button onClick={() => handleDelete(item)} className="p-2 text-red-400 hover:bg-red-50 rounded-lg transition"><Trash2 size={16} /></button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="space-y-4">
+                {history.map((item) => (
+                  <div key={item._id} className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4">
+                    {/* 상단: 날짜 및 식사 유형 */}
+                    <div className="flex justify-between items-center mb-3">
+                      <span className="text-sm font-medium text-slate-500">{item.date}</span>
+                      <span className={`px-2 py-1 rounded-full text-xs font-bold ${mealColors[item.mealType]}`}>
+                        {mealLabels[item.mealType]}
+                      </span>
+                    </div>
+                    
+                    {/* 이미지 (있을 경우) */}
+                    {item.image && (
+                      <div className="mb-3 rounded-xl overflow-hidden">
+                        <Image src={item.image} alt="food" width={300} height={200} className="w-full h-48 object-cover" />
+                      </div>
+                    )}
+                    
+                    {/* 메뉴 */}
+                    <p className="text-slate-700 mb-2">{item.content.split('\n')[1]?.split(': ')[1] || ''}</p>
+                    
+                    {/* 칼로리 */}
+                    {item.calories && (
+                      <p className="text-sm text-green-600 font-semibold mb-3 flex items-center gap-1"><Flame size={14} /> {item.calories} kcal</p>
+                    )}
+                    
+                    {/* 하단: 관리 버튼 */}
+                    <div className="flex gap-2 pt-2 border-t border-slate-100">
+                      <button onClick={() => handleEdit(item)} className="flex-1 py-2 text-blue-500 hover:bg-blue-50 rounded-lg transition text-sm font-medium">수정</button>
+                      <button onClick={() => handleDelete(item)} className="flex-1 py-2 text-red-400 hover:bg-red-50 rounded-lg transition text-sm font-medium">삭제</button>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>
@@ -571,55 +578,16 @@ export default function DietPage() {
           </div>
         )}
 
-        {/* 수정 모달 영역 */}
-        {editModal.open && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-            <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl">
-              <div className="p-4 border-b flex justify-between items-center">
-                <h3 className="font-bold">식단 기록 수정</h3>
-                <button onClick={() => setEditModal({open: false, item: null})} className="p-2 hover:bg-slate-100 rounded-full transition"><X size={20} /></button>
-              </div>
-              <div className="p-6 space-y-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-600">날짜</label>
-                  <input type="date" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl" value={editForm.date} onChange={(e) => setEditForm({...editForm, date: e.target.value})} />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-600">식사 유형</label>
-                  <div className="grid grid-cols-4 gap-2">
-                    {(['breakfast', 'lunch', 'dinner', 'other'] as MealType[]).map((type) => (
-                      <button key={type} type="button" onClick={() => setEditForm({...editForm, mealType: type})} className={`p-2 rounded-xl text-sm font-bold transition ${editForm.mealType === type ? mealColors[type] : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>{mealLabels[type]}</button>
-                    ))}
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-600">메뉴</label>
-                  <textarea className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl h-20 outline-none focus:ring-2 focus:ring-green-500" value={editForm.content} onChange={(e) => setEditForm({...editForm, content: e.target.value})} />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-600">칼로리 (kcal)</label>
-                  <input type="number" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl" value={editForm.calories} onChange={(e) => setEditForm({...editForm, calories: e.target.value})} />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-600 flex items-center gap-1"><Camera size={14} /> 사진 변경</label>
-                  <div className="flex items-center gap-4">
-                    <label className="flex items-center gap-2 px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-100 transition">
-                      <ImagePlus size={20} className="text-slate-500" /><span className="text-sm text-slate-600">사진 선택</span>
-                      <input type="file" accept="image/*" className="hidden" onChange={handleEditImageChange} />
-                    </label>
-                    {editForm.image && (
-                      <div className="relative group">
-                        <img src={getImageUrl(editForm.image) || ""} alt="preview" className="w-16 h-16 object-cover rounded-lg border shadow-sm" />
-                        <button type="button" onClick={() => setEditForm(prev => ({ ...prev, image: null }))} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition"><X size={12} /></button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <button type="button" onClick={handleUpdate} className="w-full py-4 bg-green-500 text-white font-bold rounded-2xl hover:bg-green-600 transition shadow-md">수정 사항 저장</button>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* 수정 모달 */}
+        <DietEditModal 
+          open={editModal.open} 
+          item={editModal.item}
+          form={editForm}
+          onFormChange={(field, value) => setEditForm(prev => ({ ...prev, [field]: value }))}
+          onClose={() => setEditModal({ open: false, item: null })}
+          onSave={handleUpdate}
+          onImageChange={handleEditImageChange}
+        />
       </main>
     </div>
   );

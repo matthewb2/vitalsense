@@ -49,7 +49,7 @@ export default function Header({ title }: { title?: string }) {
   const userImage = user?.image || null;
 
   return (
-   <header className="w-full mb-8 flex flex-col border-b border-slate-100 bg-white">
+   <header className="w-full mb-2 flex flex-col border-b border-slate-100 bg-white">
       {/* 1. 최상단 컨테이너를 flex flex-col로 주어 상단바와 네비바가 무조건 위아래로 쌓이게 만듭니다. */}
       
       {/* 2. 상단 레이아웃: 로고는 왼쪽, 알림/프로필은 오른쪽 끝에 배치 */}

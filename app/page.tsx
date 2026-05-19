@@ -31,7 +31,7 @@ export default function HealthDashboard() {
     }
   }, [mounted, isLoggedIn, router]);
 
-useEffect(() => {
+  useEffect(() => {
     const fetchHealthData = async () => {
       try {
         const currentToken = user?.token?.accessToken || user?.accessToken;
@@ -164,10 +164,10 @@ useEffect(() => {
     <div className="min-h-screen bg-slate-50 text-slate-900 ">
       <Header />
 
-      <main className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8 p-4">
+      <main className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-4 p-4">
         
         {/* 왼쪽: 생체 지표 카드 섹션 */}
-<div className="lg:col-span-2 space-y-6">
+        <div className="lg:col-span-2 space-y-6">
           <div className="grid grid-cols-3 gap-2 sm:gap-4">
             <HealthCard 
               title="혈압" 
@@ -216,13 +216,15 @@ useEffect(() => {
                 <Link href="/diet" className="block">
                   <div className="space-y-2">
                     {todayDiet.map((item, i) => {
-                      let mealType = item.extra?.mealType;
-                      if (!mealType && item.title) {
+                      // 변경 코드: mealType에 엄격한 유니온 타입을 명시하고 기본값 'other'를 보장합니다.
+                      let mealType: 'breakfast' | 'lunch' | 'dinner' | 'other' = item.extra?.mealType || 'other';
+                      
+                      if ((mealType === 'other') && item.title) {
                         if (item.title.startsWith('아침')) mealType = 'breakfast';
                         else if (item.title.startsWith('점심')) mealType = 'lunch';
                         else if (item.title.startsWith('저녁')) mealType = 'dinner';
                       }
-                      const mealLabel = { breakfast: '아침', lunch: '점심', dinner: '저녁', other: '기타' }[mealType] || '기타';
+                      const mealLabel = { breakfast: '아침', lunch: '점심', dinner: '저녁', other: '기타' }[mealType];
                       const content = item.content.split('\n')[1]?.split(': ')[1] || '';
                       return (
                         <div key={i} className="flex justify-between items-center p-3 bg-slate-50 rounded-lg cursor-pointer hover:bg-slate-100 transition">
@@ -244,32 +246,43 @@ useEffect(() => {
               ) : (
                 <Link href="/exercise" className="block">
                   <div className="space-y-2">
-                    {todayExercise.map((item, i) => {
-                      let exerciseType = item.extra?.exerciseType;
-                      let duration = item.extra?.duration;
-                      let calories = item.extra?.calories ? ` -${item.extra.calories}kcal` : '';
-                      
-                      if (!exerciseType && item.title) {
-                        if (item.title.startsWith('러닝')) exerciseType = 'running';
-                        else if (item.title.startsWith('걷기')) exerciseType = 'walking';
-                        else if (item.title.startsWith('수영')) exerciseType = 'swimming';
-                        else if (item.title.startsWith('자전거')) exerciseType = 'cycling';
-                        else if (item.title.startsWith('헬스')) exerciseType = 'weight';
-                        else if (item.title.startsWith('요가')) exerciseType = 'yoga';
-                      }
-                      
-                      if (!duration && item.title) {
-                        const durationMatch = item.title.match(/(\d+)분/);
-                        if (durationMatch) duration = durationMatch[1];
-                      }
-                      
-                      const exerciseLabel = { running: '러닝', walking: '걷기', swimming: '수영', cycling: '자전거', weight: '헬스', yoga: '요가', other: '기타' }[exerciseType] || '기타';
-                      return (
-                        <div key={i} className="flex justify-between items-center p-3 bg-slate-50 rounded-lg cursor-pointer hover:bg-slate-100 transition">
-                          <span>운동: {exerciseLabel} {duration ? `${duration}분` : ''}{calories}</span>
-                        </div>
-                      );
-                    })}
+                  {todayExercise.map((item, i) => {
+  let exerciseType = item.extra?.exerciseType;
+  let duration = item.extra?.duration;
+  let calories = item.extra?.calories ? ` -${item.extra.calories}kcal` : '';
+  
+  if (!exerciseType && item.title) {
+    if (item.title.startsWith('러닝')) exerciseType = 'running';
+    else if (item.title.startsWith('걷기')) exerciseType = 'walking';
+    else if (item.title.startsWith('수영')) exerciseType = 'swimming';
+    else if (item.title.startsWith('자전거')) exerciseType = 'cycling';
+    else if (item.title.startsWith('헬스')) exerciseType = 'weight';
+    else if (item.title.startsWith('요가')) exerciseType = 'yoga';
+  }
+  
+  if (!duration && item.title) {
+    const durationMatch = item.title.match(/(\d+)분/);
+    if (durationMatch) duration = durationMatch[1];
+  }
+  
+  // 묶어서 처리함으로써 implicit 'any' 에러를 완벽히 우회합니다.
+  const exerciseLabels = { 
+    running: '러닝', 
+    walking: '걷기', 
+    swimming: '수영', 
+    cycling: '자전거', 
+    weight: '헬스', 
+    yoga: '요가', 
+    other: '기타' 
+  };
+  const exerciseLabel = exerciseLabels[exerciseType as keyof typeof exerciseLabels] || '기타';
+
+  return (
+    <div key={i} className="flex justify-between items-center p-3 bg-slate-50 rounded-lg cursor-pointer hover:bg-slate-100 transition">
+      <span>운동: {exerciseLabel} {duration ? `${duration}분` : ''}{calories}</span>
+    </div>
+  );
+})}
                   </div>
                 </Link>
               )}
@@ -306,7 +319,7 @@ useEffect(() => {
 
 // 수정된 HealthCard 컴포넌트
 function HealthCard({ title, value, unit, icon, status, color = "text-green-500", href, className = "", loading = false }: any) {
-if (loading) {
+  if (loading) {
     return (
       <div className={`bg-white p-3 sm:p-4 rounded-2xl shadow-sm border border-slate-100 h-full animate-pulse ${className}`}>
         <div className="flex items-center gap-2 mb-1">
@@ -334,7 +347,6 @@ if (loading) {
     </div>
   );
 
-  // href 속성이 있으면 Link로 감싸고, 없으면 그냥 출력
   if (href) {
     return <Link href={href}>{CardContent}</Link>;
   }

@@ -260,7 +260,6 @@ export default function BmiPage() {
                 <thead className="bg-slate-50 text-slate-500 font-medium">
                   <tr>
                     <th className="p-4">날짜</th>
-                    <th className="p-4">신장</th>
                     <th className="p-4">체중</th>
                     <th className="p-4">BMI</th>
                   </tr>
@@ -269,7 +268,6 @@ export default function BmiPage() {
                   {history.map((item) => (
                     <tr key={item._id} className="hover:bg-slate-50/50 transition">
                       <td className="p-4 font-medium">{item.date}</td>
-                      <td className="p-4">{item.height} cm</td>
                       <td className="p-4">{item.weight} kg</td>
                       <td className="p-4 text-purple-600 font-bold">{item.bmi}</td>
                     </tr>

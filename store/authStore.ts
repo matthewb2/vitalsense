@@ -23,26 +23,26 @@ interface AuthState {
   isLoggedIn: boolean;
   setUser: (user: User | null) => void;
   logout: () => void;
-  checkAuth: () => void;
+  checkAuth: () => Promise<void>;
+  refreshToken: () => Promise<boolean>;
 }
 
 // 토큰이 만료되었는지 확인하는 함수
 const isTokenExpired = (token: string): boolean => {
   try {
-    const base64Url = token.split('.')[1]; // Payload 부분 추출
+    const base64Url = token.split('.')[1];
     const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
     const payload = JSON.parse(window.atob(base64));
-
-    const now = Math.floor(Date.now() / 1000); // 현재 시간 (초 단위)
-    return payload.exp < now; // 만료 시간이 현재보다 작으면 true
+    const now = Math.floor(Date.now() / 1000);
+    return payload.exp < now;
   } catch (e) {
-    return true; // 에러 발생 시 만료된 것으로 간주
+    return true;
   }
 };
 
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set, get) => ({ // get 추가
+    (set, get) => ({
       user: null,
       isLoggedIn: false,
       setUser: (user) => set({ user, isLoggedIn: !!user }),
@@ -50,17 +50,69 @@ export const useAuthStore = create<AuthState>()(
         set({ user: null, isLoggedIn: false });
         localStorage.removeItem('auth-storage');
       },
-      checkAuth: () => {
+      refreshToken: async () => {
         const { user, logout } = get();
-        const token = user?.accessToken || user?.token?.accessToken;
+        const refreshToken = user?.token?.refreshToken;
+        
+        if (!refreshToken) {
+          console.log('refreshToken이 없습니다.');
+          logout();
+          return false;
+        }
 
-        if (token) {
-          if (isTokenExpired(token)) {
-            console.log('토큰이 만료되었습니다. 로그아웃 처리합니다.');
-            logout(); // 만료되었으면 스토어 청소
+        try {
+          const response = await fetch('/api/auth/refresh', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'client-id': 'vitalsense',
+            },
+            body: JSON.stringify({ refreshToken }),
+          });
+          
+          const data = await response.json();
+          
+          if (data.ok && data.item?.token?.accessToken) {
+            const updatedUser = {
+              ...user,
+              token: {
+                ...user?.token,
+                accessToken: data.item.token.accessToken,
+                refreshToken: data.item.token.refreshToken || refreshToken,
+              },
+              accessToken: data.item.token.accessToken,
+            };
+            set({ user: updatedUser, isLoggedIn: true });
+            console.log('토큰 갱신 성공');
+            return true;
           } else {
-            set({ isLoggedIn: true }); // 유효하면 로그인 유지
+            console.log('토큰 갱신 실패:', data.message);
+            logout();
+            return false;
           }
+        } catch (err) {
+          console.error('토큰 갱신 오류:', err);
+          logout();
+          return false;
+        }
+      },
+      checkAuth: async () => {
+        const { user, logout, refreshToken } = get();
+        const accessToken = user?.accessToken || user?.token?.accessToken;
+
+        if (accessToken) {
+          if (isTokenExpired(accessToken)) {
+            console.log('accessToken이 만료되었습니다. refresh 시도...');
+            const refreshed = await refreshToken();
+            if (!refreshed) {
+              console.log('refresh 실패, 로그아웃 처리');
+            }
+          } else {
+            set({ isLoggedIn: true });
+          }
+        } else if (user?.token?.refreshToken) {
+          console.log('accessToken이 없고 refreshToken만 있습니다. 갱신 시도...');
+          await refreshToken();
         } else {
           set({ isLoggedIn: false });
         }

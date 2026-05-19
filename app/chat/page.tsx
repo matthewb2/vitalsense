@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Send, History } from 'lucide-react';
+import { Send, History, Trash2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { useAuthStore } from '@/store/authStore';
 import Header from '@/app/components/Header';
@@ -70,6 +70,28 @@ function ChatContent() {
   const handleHistoryClick = (content: string) => {
     setInput(content);
     setShowHistory(false);
+  };
+
+  const handleDeleteHistory = async (e: React.MouseEvent, itemId: string) => {
+    e.stopPropagation();
+    const currentToken = user?.token?.accessToken || user?.accessToken;
+    if (!currentToken || !itemId) return;
+    
+    try {
+      const response = await fetch(`/api/posts?id=${itemId}`, {
+        method: 'DELETE',
+        headers: {
+          'client-id': 'vitalsense',
+          'Authorization': `Bearer ${currentToken}`
+        }
+      });
+      const data = await response.json();
+      if (data.ok) {
+        setChatHistory(prev => prev.filter(item => item._id !== itemId));
+      }
+    } catch (err) {
+      console.error('Error deleting chat history:', err);
+    }
   };
 
   const handleSendMessage = async () => {
@@ -143,12 +165,18 @@ function ChatContent() {
               <div className="space-y-2">
                 {chatHistory.map((item, i) => (
                   <div 
-                    key={i} 
+                    key={item._id || i} 
                     onClick={() => handleHistoryClick(item.content)}
-                    className="p-3 bg-slate-50 rounded-lg hover:bg-slate-100 cursor-pointer"
+                    className="p-3 bg-slate-50 rounded-lg hover:bg-slate-100 cursor-pointer relative"
                   >
-                    <p className="text-sm text-slate-700 line-clamp-2">{item.content}</p>
+                    <p className="text-sm text-slate-700 line-clamp-2 pr-8">{item.content}</p>
                     <p className="text-xs text-slate-400 mt-1">{item.createdAt?.split('T')[0] || ''}</p>
+                    <button 
+                      onClick={(e) => handleDeleteHistory(e, item._id)}
+                      className="absolute top-3 right-3 p-1 text-slate-400 hover:text-red-500"
+                    >
+                      <Trash2 size={16} />
+                    </button>
                   </div>
                 ))}
               </div>
@@ -161,7 +189,7 @@ function ChatContent() {
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
         {messages.map((msg, i) => (
           <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-[85%] p-4 rounded-2xl text-lg whitespace-pre-wrap ${
+            <div className={`max-w-[90%] p-4 rounded-2xl text-xl whitespace-pre-wrap ${
               msg.role === 'user' 
                 ? 'bg-blue-600 text-white' 
                 : 'bg-slate-100 text-slate-800'
@@ -185,8 +213,8 @@ function ChatContent() {
       </div>
 
       {/* 하단 입력창 */}
-      <div className="sticky bottom-0 bg-white border-t px-4 py-4">
-        <div className="max-w-3xl mx-auto flex items-center gap-2">
+      <div className="sticky bottom-0 w-full bg-white border-t px-4 py-4">
+        <div className="w-full max-w-3xl mx-auto flex items-center gap-2">
           <button 
             onClick={() => { fetchChatHistory(); setShowHistory(true); }}
             className="p-4 text-slate-500 hover:text-blue-600 hover:bg-slate-100 rounded-2xl transition"
