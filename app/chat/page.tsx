@@ -146,7 +146,7 @@ function ChatContent() {
     }
   };
   return (
-    <div className="min-h-screen bg-white flex flex-col">
+    <div className="h-[100dvh] w-full bg-white flex flex-col overflow-hidden">
       <Header title="바이탈센스 AI" />
       
       {/* 히스토리 패널 */}
@@ -186,7 +186,7 @@ function ChatContent() {
       )}
 
       {/* 채팅 영역 - 전체 화면 */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 min-h-0">
         {messages.map((msg, i) => (
           <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div className={`max-w-[90%] p-4 rounded-2xl text-xl whitespace-pre-wrap ${
@@ -213,7 +213,7 @@ function ChatContent() {
       </div>
 
       {/* 하단 입력창 */}
-      <div className="sticky bottom-0 w-full bg-white border-t px-4 py-4">
+      <div className="flex-shrink-0 sticky bg-white border-t px-4 py-4">
         <div className="w-full max-w-3xl mx-auto flex items-center gap-2">
           <button 
             onClick={() => { fetchChatHistory(); setShowHistory(true); }}
