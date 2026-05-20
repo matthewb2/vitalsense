@@ -33,7 +33,7 @@ export default function Header({ title }: { title?: string }) {
     { href: '/bmi', icon: Calculator, label: 'BMI' },
     { href: '/diet', icon: Utensils, label: '식단' },
     { href: '/exercise', icon: Dumbbell, label: '운동' },
-    { href: '/chat', icon: MessageCircle, label: '채팅' },
+    { href: '/chat', icon: MessageCircle, label: 'AI상담' },
   ];
 
   useEffect(() => {

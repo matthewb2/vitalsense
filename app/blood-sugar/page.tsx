@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Header from '../components/Header';
 import Navigation from '@/components/Navigation';
+import { useSwipeNavigate } from '../components/useSwipeNavigate';
 import { Droplets, Calendar, Save, List, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { useAuthStore } from '@/store/authStore';
@@ -19,6 +20,8 @@ export default function BloodSugarPage() {
   const [error, setError] = useState('');
   const [history, setHistory] = useState<any[]>([]);
   const [fetching, setFetching] = useState(false);
+
+  useSwipeNavigate('/blood-pressure', '/bmi');
 
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],

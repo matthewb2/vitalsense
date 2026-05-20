@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Header from '../components/Header';
 import Navigation from '@/components/Navigation';
+import { useSwipeNavigate } from '../components/useSwipeNavigate';
 import { Activity, Calculator, Ruler, Scale, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useAuthStore } from '@/store/authStore';
@@ -35,6 +36,8 @@ export default function BmiPage() {
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
   const [history, setHistory] = useState<HistoryItem[]>([]);
+
+  useSwipeNavigate('/blood-sugar', '/diet');
 
   useEffect(() => {
     checkAuth();

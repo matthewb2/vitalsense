@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Header from '../components/Header';
 import Navigation from '@/components/Navigation';
+import { useSwipeNavigate } from '../components/useSwipeNavigate';
 import { Heart, Calendar, Save, List, Plus, Edit2, Trash2, X } from 'lucide-react';
 import Link from 'next/link';
 import { useAuthStore } from '@/store/authStore';
@@ -21,6 +22,8 @@ export default function BloodPressurePage() {
   const [fetching, setFetching] = useState(false);
   const [editModal, setEditModal] = useState<{open: boolean; item: any | null}>({open: false, item: null});
   const [editForm, setEditForm] = useState({ systolic: '', diastolic: '' });
+
+  useSwipeNavigate(undefined, '/blood-sugar');
 
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],

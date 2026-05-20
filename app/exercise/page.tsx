@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Header from '../components/Header';
 import Navigation from '@/components/Navigation';
+import { useSwipeNavigate } from '../components/useSwipeNavigate';
 import { Dumbbell, Clock, Plus, List, Trash2, ArrowLeft, Flame, Edit2, X } from 'lucide-react';
 import Link from 'next/link';
 import { useAuthStore } from '@/store/authStore';
@@ -63,6 +64,8 @@ export default function ExercisePage() {
   });
   const [editModal, setEditModal] = useState<{open: boolean; item: ExerciseRecord | null}>({open: false, item: null});
   const [editForm, setEditForm] = useState({ date: '', exerciseType: 'running' as ExerciseType, duration: '', calories: '', content: '' });
+
+  useSwipeNavigate('/diet', '/chat');
 
   useEffect(() => {
     checkAuth();
@@ -296,8 +299,7 @@ export default function ExercisePage() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 p-4 md:p-8">
-      <Header />
-      <Navigation />
+      <Header />     
 
       <main className="max-w-2xl mx-auto mt-6">
 

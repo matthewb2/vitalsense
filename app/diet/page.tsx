@@ -5,6 +5,7 @@ import Image from 'next/image'
 import Header from '../components/Header';
 import Navigation from '@/components/Navigation';
 import DietEditModal from '../components/DietEditModal';
+import { useSwipeNavigate } from '../components/useSwipeNavigate';
 import { Utensils, Clock, Plus, List, Trash2, Edit2, X, ImagePlus, Camera, Loader2, Flame } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 
@@ -456,9 +457,20 @@ export default function DietPage() {
       <Header />
       
       <main className="max-w-md mx-auto mt-4">
-        <div className="flex bg-white p-1.5 rounded-2xl shadow-sm mb-4 border border-slate-200">
-          <TabButton active={activeTab === 'list'} onClick={() => setActiveTab('list')} icon={<List size={18} />} label="기록 목록" />
-          <TabButton active={activeTab === 'record'} onClick={() => setActiveTab('record')} icon={<Plus size={18} />} label="식사 기록" />
+        		
+		        <div className="flex bg-white p-1.5 rounded-2xl shadow-sm mb-8 w-fit mx-auto border border-slate-200">
+          <TabButton 
+            active={activeTab === 'list'} 
+            onClick={() => setActiveTab('list')} 
+            icon={<List size={18} />} 
+            label="기록 목록" 
+          />
+          <TabButton 
+            active={activeTab === 'record'} 
+            onClick={() => setActiveTab('record')} 
+            icon={<Plus size={18} />} 
+            label="식사 기록" 
+          />
         </div>
 
         {activeTab === 'list' ? (

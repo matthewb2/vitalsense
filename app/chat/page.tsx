@@ -7,6 +7,7 @@ import { Send, History, Trash2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { useAuthStore } from '@/store/authStore';
 import Header from '@/app/components/Header';
+import { useSwipeNavigate } from '@/app/components/useSwipeNavigate';
 
 const initialMessages = [
   { role: 'ai', content: '안녕하세요! 저는 바이탈센스 에이전트입니다. 건강에 관한 무엇이든 물어보세요. 혈당, 혈압, 식단, 운동 등 다양한 건강 정보를 알려드릴 수 있습니다.' }
@@ -23,6 +24,8 @@ function ChatContent() {
   const [showHistory, setShowHistory] = useState(false);
   const [chatHistory, setChatHistory] = useState<any[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useSwipeNavigate('/exercise', '/');
 
   useEffect(() => {
     setMounted(true);
@@ -189,22 +192,56 @@ function ChatContent() {
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 min-h-0">
         {messages.map((msg, i) => (
           <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-[90%] p-4 rounded-2xl text-xl whitespace-pre-wrap ${
-              msg.role === 'user' 
-                ? 'bg-blue-600 text-white' 
-                : 'bg-slate-100 text-slate-800'
-            }`}>
-              {msg.role === 'user' ? msg.content : (
-                <div className="prose prose-sm max-w-none">
-                  <ReactMarkdown>{msg.content}</ReactMarkdown>
-                </div>
-              )}
-            </div>
+            <div
+  className={`max-w-[90%] p-4 rounded-2xl whitespace-pre-wrap ${
+    msg.role === 'user'
+      ? 'bg-blue-600 text-white text-lg'
+      : 'bg-slate-100 text-slate-800'
+  }`}
+>
+  {msg.role === 'user' ? (
+    msg.content
+  ) : (
+    <div className="prose max-w-none text-lg">
+      <ReactMarkdown
+        components={{
+          p: ({ children }) => (
+            <p className="text-lg leading-relaxed mb-4">
+              {children}
+            </p>
+          ),
+          li: ({ children }) => (
+            <li className="text-lg leading-relaxed">
+              {children}
+            </li>
+          ),
+          h1: ({ children }) => (
+            <h1 className="text-3lg font-bold mb-4">
+              {children}
+            </h1>
+          ),
+          h2: ({ children }) => (
+            <h2 className="text-2lg font-bold mb-3">
+              {children}
+            </h2>
+          ),
+          h3: ({ children }) => (
+            <h3 className="text-lg font-bold mb-2">
+              {children}
+            </h3>
+          ),
+        }}
+      >
+        {msg.content}
+      </ReactMarkdown>
+    </div>
+  )}
+</div>
           </div>
         ))}
         {loading && (
           <div className="flex justify-start">
-            <div className="max-w-[85%] p-4 rounded-2xl bg-slate-100">
+            <div className="max-w-[85%] p-4 rounded-2xl bg-slate-100 text-xl">
               <span className="animate-pulse">입력 중...</span>
             </div>
           </div>
@@ -213,7 +250,7 @@ function ChatContent() {
       </div>
 
       {/* 하단 입력창 */}
-      <div className="flex-shrink-0 sticky bg-white border-t px-4 py-4">
+      <div className="flex-shrink-0 sticky bg-white border-t px-4 py-4 bottom-0">
         <div className="w-full max-w-3xl mx-auto flex items-center gap-2">
           <button 
             onClick={() => { fetchChatHistory(); setShowHistory(true); }}
@@ -228,13 +265,13 @@ function ChatContent() {
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
             placeholder="건강에 대해 질문하세요..."
-            className="flex-1 p-4 bg-slate-100 border-0 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-lg"
+            className="flex-1 min-w-0 p-4 bg-slate-100 border-0 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-lg"
             disabled={loading}
           />
           <button 
             onClick={handleSendMessage} 
             disabled={loading || !input.trim()}
-            className="p-4 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition disabled:opacity-50"
+            className="min-w-0 p-4 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition disabled:opacity-50"
           >
             <Send size={24} />
           </button>
