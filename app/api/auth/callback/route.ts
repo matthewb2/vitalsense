@@ -96,12 +96,14 @@ export async function GET(req: NextRequest) {
     }
     
     if (userObj) {
+      const profileImage = userObj.image || googleImage || '';
+      
       const userData = {
         _id: userObj._id,
         email: userObj.email || googleEmail,
         name: userObj.name || googleName,
         type: userObj.type,
-        image: userObj.image || googleImage,
+        image: profileImage,
         loginType: userObj.loginType || 'google',
         accessToken: accessToken,
         token: { accessToken: accessToken },

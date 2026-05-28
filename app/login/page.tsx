@@ -56,6 +56,9 @@ const data = await response.json();
        if (response.ok && (data.ok || data._id)) {
          const userItem = data.item || data;
          
+         // 이미지 URL 추출: API 응답에 image 있으면 사용, 없으면 googleImage 사용
+         let profileImage = userItem.image || googleImage;
+         
          // Extract accessToken from various possible locations
          const accessToken = data.accessToken || data.item?.token?.accessToken || data.item?.accessToken || userItem.token?.accessToken;
          
@@ -64,7 +67,7 @@ const data = await response.json();
            email: userItem.email || googleEmail,
            name: userItem.name || googleName,
            type: userItem.type,
-           image: userItem.image || googleImage,
+           image: profileImage,
            loginType: 'google',
            accessToken: accessToken,
            token: { 
@@ -73,9 +76,9 @@ const data = await response.json();
            },
          };
          setUser(userData);
-         //alert('로그인 성공!');
+         alert('로그인 성공!');
          router.push('/');
-      } else {
+       } else {
         const params = new URLSearchParams({
           email: googleEmail || '',
           name: googleName || '',

@@ -31,6 +31,8 @@ export async function POST(req: NextRequest) {
       const accessToken = loginData.item?.token?.accessToken || loginData.token?.accessToken;
       const refreshToken = loginData.item?.token?.refreshToken || loginData.token?.refreshToken;
       
+      const profileImage = userObj.image || image || '';
+      
       console.log('Extracted tokens:', { accessToken, refreshToken });
       
       return NextResponse.json({
@@ -39,7 +41,7 @@ export async function POST(req: NextRequest) {
         email: userObj.email,
         name: userObj.name,
         type: userObj.type,
-        image: userObj.image || image,
+        image: profileImage,
         accessToken: accessToken,
         token: { 
           accessToken: accessToken,
