@@ -56,30 +56,25 @@ export default function DietPage() {
     mealType: 'breakfast' as MealType,
     content: '',
     calories: '',
-    image: null as string | null,
+    images: [] as string[],
   });
   const [editModal, setEditModal] = useState<{open: boolean; item: FoodRecord | null}>({open: false, item: null});
   const [editForm, setEditForm] = useState({ date: '', mealType: 'breakfast' as MealType, content: '', calories: '', image: null as string | null });
   
   // AI 분석 상태 관리
   const [analyzing, setAnalyzing] = useState(false);
-  const [analysisResult, setAnalysisResult] = useState<{food_name: string; calories: number} | null>(null);
+  const [analysisResults, setAnalysisResults] = useState<{food_name: string; calories: number}[]>([]);
+  const [totalCalories, setTotalCalories] = useState(0);
 
 // Groq API 이미지 분석 함수
-  const analyzeImage = async (base64Image: string) => {
+  const analyzeImage = async (base64Image: string): Promise<{food_name: string; calories: number} | null> => {
     const apiKey = process.env.NEXT_PUBLIC_GROQ_API_KEY;
-    console.log('[AI] API Key loaded:', apiKey ? 'YES' : 'NO');
-    console.log('[AI] base64Image length:', base64Image?.length);
     if (!apiKey || !base64Image) {
       console.warn('[AI] GROQ_API_KEY가 설정되지 않았습니다.');
-      return;
+      return null;
     }
-    console.log('[AI] 이미지 분석 시작...');
-    setAnalyzing(true);
-    setAnalysisResult(null);
 
     try {
-      console.log('[AI] Groq API 요청 전송 중...', { model: 'meta-llama/llama-4-scout-17b-16e-instruct' });
       const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
         headers: {
@@ -104,43 +99,28 @@ export default function DietPage() {
       });
 
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error('[AI] Groq API Error:', response.status, errorText);
         throw new Error(`API request failed: ${response.status}`);
       }
 
       const data = await response.json();
-      console.log('[AI] Groq API Response raw:', data);
       const content = data.choices?.[0]?.message?.content;
-      console.log('[AI] Groq API content raw:', content);
       if (content) {
-        try {
-          let cleanContent = content.trim();
-          if (!cleanContent.startsWith('{')) {
-            const braceStart = cleanContent.indexOf('{');
-            if (braceStart >= 0) cleanContent = cleanContent.substring(braceStart);
-          }
-          if (!cleanContent.endsWith('}')) {
-            const braceEnd = cleanContent.lastIndexOf('}');
-            if (braceEnd >= 0) cleanContent = cleanContent.substring(0, braceEnd + 1);
-          }
-          console.log('[AI] Cleaned content:', cleanContent);
-          const parsed = JSON.parse(cleanContent);
-          console.log('[AI] 분석 결과:', parsed);
-          setAnalysisResult(parsed);
-          if (parsed.calories) {
-            setFormData(prev => ({ ...prev, calories: String(parsed.calories) }));
-            console.log('[AI] 칼로리 자동 입력:', parsed.calories);
-          }
-        } catch (parseError) {
-          console.error('[AI] JSON parse error:', parseError, "Content:", content);
+        let cleanContent = content.trim();
+        if (!cleanContent.startsWith('{')) {
+          const braceStart = cleanContent.indexOf('{');
+          if (braceStart >= 0) cleanContent = cleanContent.substring(braceStart);
         }
+        if (!cleanContent.endsWith('}')) {
+          const braceEnd = cleanContent.lastIndexOf('}');
+          if (braceEnd >= 0) cleanContent = cleanContent.substring(0, braceEnd + 1);
+        }
+        const parsed = JSON.parse(cleanContent);
+        return parsed;
       }
+      return null;
     } catch (error) {
       console.error('[AI] 분석 중 오류 발생:', error);
-    } finally {
-      setAnalyzing(false);
-      console.log('[AI] 분석 완료');
+      return null;
     }
   };
 
@@ -178,18 +158,33 @@ export default function DietPage() {
     });
   };
 
-  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
     try {
-      const compressed = await compressImage(file);
-      setFormData(prev => ({ ...prev, image: compressed }));
+      const compressed = await Promise.all(files.map(f => compressImage(f)));
+      setFormData(prev => ({ ...prev, images: [...prev.images, ...compressed] }));
       
-      // 이미지 선택 즉시 분석 시작
-      const base64Only = compressed.split(',')[1];
-      await analyzeImage(base64Only);
+      setAnalyzing(true);
+      let total = totalCalories;
+      const newResults: {food_name: string; calories: number}[] = [];
+      
+      for (const img of compressed) {
+        const base64Only = img.split(',')[1];
+        const result = await analyzeImage(base64Only);
+        if (result && result.calories) {
+          newResults.push(result);
+          total += result.calories;
+        }
+      }
+      
+      setAnalysisResults(prev => [...prev, ...newResults]);
+      setTotalCalories(total);
+      setFormData(prev => ({ ...prev, calories: String(total) }));
+      setAnalyzing(false);
     } catch (error) {
       console.error('이미지 처리 오류:', error);
+      setAnalyzing(false);
     }
   };
 
@@ -253,33 +248,36 @@ export default function DietPage() {
     if (!currentToken) { setLoading(false); return; }
 
     try {
-      let imagePath = null;
-      if (formData.image && formData.image.startsWith('data:')) {
-        const base64Data = formData.image.split(',')[1];
-        const byteCharacters = atob(base64Data);
-        const byteNumbers = new Array(byteCharacters.length);
-        for (let i = 0; i < byteCharacters.length; i++) {
-          byteNumbers[i] = byteCharacters.charCodeAt(i);
-        }
-        const byteArray = new Uint8Array(byteNumbers);
-        const blob = new Blob([byteArray], { type: 'image/jpeg' });
+      let imagePaths: string[] = [];
+      if (formData.images.length > 0) {
+        for (const img of formData.images) {
+          if (!img.startsWith('data:')) continue;
+          const base64Data = img.split(',')[1];
+          const byteCharacters = atob(base64Data);
+          const byteNumbers = new Array(byteCharacters.length);
+          for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+          }
+          const byteArray = new Uint8Array(byteNumbers);
+          const blob = new Blob([byteArray], { type: 'image/jpeg' });
 
-        const fileFormData = new FormData();
-        fileFormData.append('file', blob, `diet_${Date.now()}.jpg`);
+          const fileFormData = new FormData();
+          fileFormData.append('file', blob, `diet_${Date.now()}.jpg`);
 
-        const fileResponse = await fetch('/api/files', {
-          method: 'POST',
-          headers: {
-            'client-id': 'vitalsense',
-            'Authorization': `Bearer ${currentToken}`
-          },
-          body: fileFormData,
-        });
+          const fileResponse = await fetch('/api/files', {
+            method: 'POST',
+            headers: {
+              'client-id': 'vitalsense',
+              'Authorization': `Bearer ${currentToken}`
+            },
+            body: fileFormData,
+          });
 
-        const fileData = await fileResponse.json();
-        const fullPath = fileData.path || fileData.item?.[0]?.path || fileData.url;
-        if (fullPath) {
-          imagePath = fullPath.split('/').pop();
+          const fileData = await fileResponse.json();
+          const fullPath = fileData.path || fileData.item?.[0]?.path || fileData.url;
+          if (fullPath) {
+            imagePaths.push(fullPath.split('/').pop());
+          }
         }
       }
 
@@ -297,7 +295,7 @@ export default function DietPage() {
           type: 'diet',
           title: `${mealLabels[formData.mealType]} - ${formData.content.slice(0, 20)}`,
           content: finalContent,
-          image: imagePath,
+          image: imagePaths.length > 0 ? imagePaths.join(',') : null,
           extra: { 
             userId: user?._id, 
             userName: user?.name,
@@ -315,9 +313,10 @@ export default function DietPage() {
           mealType: 'breakfast',
           content: '',
           calories: '',
-          image: null,
+          images: [],
         });
-        setAnalysisResult(null);
+        setAnalysisResults([]);
+        setTotalCalories(0);
         setTimeout(() => {
           setSaved(false);
           setActiveTab('list');
@@ -556,10 +555,21 @@ export default function DietPage() {
                   </label>
 
                   {/* 사진 미리보기 */}
-                  {formData.image && (
-                    <div className="relative group">
-                      <img src={formData.image} alt="preview" className="w-16 h-16 object-cover rounded-xl border-2 border-green-500 shadow-sm" />
-                      <button type="button" onClick={() => { setFormData(prev => ({ ...prev, image: null })); setAnalysisResult(null); }} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-md group-hover:scale-110 transition"><X size={12} /></button>
+                  {formData.images.length > 0 && (
+                    <div className="flex gap-2 flex-wrap">
+                      {formData.images.map((img, idx) => (
+                        <div key={idx} className="relative group">
+                          <img src={img} alt="preview" className="w-16 h-16 object-cover rounded-xl border-2 border-green-500 shadow-sm" />
+                          <button type="button" onClick={() => { 
+                            setFormData(prev => ({ ...prev, images: prev.images.filter((_, i) => i !== idx) })); 
+                            const removed = analysisResults.find((_, i) => i === idx);
+                            if (removed) {
+                              setTotalCalories(prev => Math.max(0, prev - removed.calories));
+                              setAnalysisResults(prev => prev.filter((_, i) => i !== idx));
+                            }
+                          }} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-md group-hover:scale-110 transition"><X size={12} /></button>
+                        </div>
+                      ))}
                     </div>
                   )}
 
@@ -571,12 +581,18 @@ export default function DietPage() {
                     </div>
                   )}
                   
-                  {analysisResult && (
+                  {analysisResults.length > 0 && (
                     <div className="bg-emerald-50 border border-emerald-100 px-4 py-2 rounded-xl flex flex-col justify-center shadow-sm">
                       <span className="text-[10px] text-emerald-500 font-bold uppercase tracking-tighter">AI Result</span>
-                      <div className="flex items-center gap-1">
-                        <span className="text-sm font-bold text-emerald-700">{analysisResult.calories}</span>
-                        <span className="text-[10px] text-emerald-600 font-medium pt-0.5">kcal</span>
+                      <div className="space-y-0.5">
+                        {analysisResults.map((r, i) => (
+                          <p key={i} className="text-xs text-emerald-600">
+                            #{i + 1}. {r.food_name}: {r.calories}kcal
+                          </p>
+                        ))}
+                        <div className="text-sm font-bold text-emerald-700 border-t border-emerald-200 pt-0.5 mt-0.5">
+                          합계: {totalCalories} kcal
+                        </div>
                       </div>
                     </div>
                   )}
