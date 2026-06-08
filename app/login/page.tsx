@@ -75,8 +75,7 @@ const data = await response.json();
              refreshToken: data.item?.token?.refreshToken || userItem.token?.refreshToken 
            },
          };
-         setUser(userData);
-         alert('로그인 성공!');
+         setUser(userData);         
          router.push('/');
        } else {
         const params = new URLSearchParams({

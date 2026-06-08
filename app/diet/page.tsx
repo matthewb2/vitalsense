@@ -51,6 +51,7 @@ export default function DietPage() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [saved, setSaved] = useState(false);
   const [history, setHistory] = useState<FoodRecord[]>([]);
+  const [visibleCount, setVisibleCount] = useState(5);
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
     mealType: 'breakfast' as MealType,
@@ -65,6 +66,7 @@ export default function DietPage() {
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisResults, setAnalysisResults] = useState<{food_name: string; calories: number}[]>([]);
   const [totalCalories, setTotalCalories] = useState(0);
+  const [imageIndexMap, setImageIndexMap] = useState<Record<number, number>>({});
 
 // Groq API 이미지 분석 함수
   const analyzeImage = async (base64Image: string): Promise<{food_name: string; calories: number} | null> => {
@@ -159,7 +161,7 @@ export default function DietPage() {
   };
 
 const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
+    const files = Array.from(e.target.files || []).reverse();
     if (files.length === 0) return;
     try {
       const compressed = await Promise.all(files.map(f => compressImage(f)));
@@ -187,6 +189,8 @@ const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
       setAnalyzing(false);
     }
   };
+  
+  useSwipeNavigate('/bmi', '/exercise');
 
   useEffect(() => {
     checkAuth();
@@ -226,7 +230,7 @@ const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
             mealType: mealType,
             content: item.content,
             calories: item.extra?.calories?.toString() || '',
-            image: item.image ? getImageUrl(item.image) : null,
+            image: item.image || null,
           };
         });
         setHistory(parsed);
@@ -481,8 +485,8 @@ const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
             ) : history.length === 0 ? (
               <div className="p-8 text-center text-slate-400">기록된 식사 데이터가 없습니다.</div>
             ) : (
-              <div className="space-y-4">
-                {history.map((item) => (
+              <><div className="space-y-4">
+                {history.slice(0, visibleCount).map((item) => (
                   <div key={item._id} className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4">
                     {/* 상단: 날짜 및 식사 유형 */}
                     <div className="flex justify-between items-center mb-3">
@@ -493,11 +497,43 @@ const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
                     </div>
                     
                     {/* 이미지 (있을 경우) */}
-                    {item.image && (
-                      <div className="mb-3 rounded-xl overflow-hidden">
-                        <Image src={item.image} alt="food" width={300} height={200} className="w-full h-48 object-cover" />
-                      </div>
-                    )}
+                    {item.image && (() => {
+                      const images = item.image!.split(',').filter(Boolean);
+                      const currentIdx = imageIndexMap[item._id] || 0;
+                      const src = getImageUrl(images[currentIdx]);
+                      return (
+                        <div className="mb-3 rounded-xl overflow-hidden relative group">
+                          {images.length > 1 && (
+                            <>
+                              {currentIdx > 0 && (
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); setImageIndexMap(prev => ({ ...prev, [item._id]: currentIdx - 1 })); }}
+                                  className="absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-black/40 text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition hidden md:block"
+                                >
+                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6"/></svg>
+                                </button>
+                              )}
+                              {currentIdx < images.length - 1 && (
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); setImageIndexMap(prev => ({ ...prev, [item._id]: currentIdx + 1 })); }}
+                                  className="absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-black/40 text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition hidden md:block"
+                                >
+                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6"/></svg>
+                                </button>
+                              )}
+                              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-10 flex gap-1.5">
+                                {images.map((_, dotIdx) => (
+                                  <button key={dotIdx} onClick={(e) => { e.stopPropagation(); setImageIndexMap(prev => ({ ...prev, [item._id]: dotIdx })); }}
+                                    className={`w-2 h-2 rounded-full transition ${dotIdx === currentIdx ? 'bg-white' : 'bg-white/40'}`}
+                                  />
+                                ))}
+                              </div>
+                            </>
+                          )}
+                          {src && <Image src={src} alt="food" width={300} height={200} className="w-full h-48 object-cover" />}
+                        </div>
+                      );
+                    })()}
                     
                     {/* 메뉴 */}
                     <p className="text-slate-700 mb-2">{item.content.split('\n')[1]?.split(': ')[1] || ''}</p>
@@ -515,6 +551,13 @@ const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
                   </div>
                 ))}
               </div>
+              {visibleCount < history.length && (
+                <div className="text-center pt-2">
+                  <button onClick={() => setVisibleCount(prev => prev + 5)} className="text-sm text-green-500 hover:text-green-700 font-medium">
+                    더보기
+                  </button>
+                </div>
+              )}</>
             )}
           </div>
         ) : (

@@ -1,12 +1,15 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Header from '../components/Header';
 import Navigation from '@/components/Navigation';
 import { useSwipeNavigate } from '../components/useSwipeNavigate';
 import { Activity, Calculator, Ruler, Scale, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useAuthStore } from '@/store/authStore';
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine
+} from 'recharts';
 
 const API_URL = '/api/posts';
 
@@ -35,6 +38,7 @@ export default function BmiPage() {
   const [calculatedBmi, setCalculatedBmi] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(5);
   const [history, setHistory] = useState<HistoryItem[]>([]);
 
   useSwipeNavigate('/blood-sugar', '/diet');
@@ -171,6 +175,14 @@ export default function BmiPage() {
 
   const bmiStatus = calculatedBmi ? getBmiStatus(calculatedBmi) : null;
 
+  const chartData = useMemo(() => {
+    const sorted = [...history].sort((a, b) => a.date.localeCompare(b.date));
+    return sorted.map(item => ({
+      date: item.date.slice(5),
+      bmi: parseFloat(item.bmi),
+    }));
+  }, [history]);
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 ">
       <Header />
@@ -253,9 +265,30 @@ export default function BmiPage() {
           </form>
         </div>
 
+        {chartData.length > 1 && (
+          <div className="mt-6 bg-white rounded-3xl shadow-sm border border-slate-100 p-4">
+            <h3 className="font-bold flex items-center gap-2 mb-4"><Activity size={18} className="text-purple-500" /> BMI 변화 추이</h3>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  <XAxis dataKey="date" tick={{ fontSize: 12 }} stroke="#94a3b8" />
+                  <YAxis domain={['auto', 'auto']} tick={{ fontSize: 12 }} stroke="#94a3b8" />
+                  <Tooltip contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0' }} />
+                  <ReferenceLine y={18.5} stroke="#3b82f6" strokeDasharray="4 4" label={{ value: '저체중', position: 'insideTopLeft', fontSize: 11, fill: '#3b82f6' }} />
+                  <ReferenceLine y={23} stroke="#10b981" strokeDasharray="4 4" label={{ value: '정상', position: 'insideTopLeft', fontSize: 11, fill: '#10b981' }} />
+                  <ReferenceLine y={25} stroke="#eab308" strokeDasharray="4 4" label={{ value: '과체중', position: 'insideTopLeft', fontSize: 11, fill: '#eab308' }} />
+                  <ReferenceLine y={30} stroke="#ef4444" strokeDasharray="4 4" label={{ value: '비만', position: 'insideTopLeft', fontSize: 11, fill: '#ef4444' }} />
+                  <Line type="monotone" dataKey="bmi" name="BMI" stroke="#8b5cf6" strokeWidth={2} dot={{ r: 4 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
+
         {history.length > 0 && (
-          <div className="mt-6 bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
-            <div className="p-4 bg-slate-50 border-b border-slate-100">
+            <div className="mt-6 bg-white rounded-3xl shadow-sm border border-slate-100">
+              <div className="p-4 bg-slate-50 border-b border-slate-100 overflow-hidden rounded-t-3xl">
               <h3 className="font-bold flex items-center gap-2"><Activity size={18} className="text-purple-500" /> BMI 기록 목록</h3>
             </div>
             <div className="overflow-x-auto">
@@ -268,7 +301,7 @@ export default function BmiPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                  {history.map((item) => (
+                  {history.slice(0, visibleCount).map((item) => (
                     <tr key={item._id} className="hover:bg-slate-50/50 transition">
                       <td className="p-4 font-medium">{item.date}</td>
                       <td className="p-4">{item.weight} kg</td>
@@ -278,6 +311,21 @@ export default function BmiPage() {
                 </tbody>
               </table>
             </div>
+            {/* 수정된 더보기 영역 */}
+              <div className="p-4 text-center border-t border-slate-100 bg-slate-50/30 rounded-b-3xl">
+                {visibleCount < history.length ? (
+                  <button 
+                    onClick={() => setVisibleCount(prev => prev + 5)} 
+                    className="text-sm text-blue-600 hover:text-blue-800 font-bold py-2 px-6 hover:bg-blue-50 rounded-xl transition"
+                  >
+                    더보기 ({(history.length - visibleCount) > 5 ? 5 : history.length - visibleCount}개 남음)
+                  </button>
+                ) : (
+                  <span className="text-sm text-slate-400 font-medium">
+                    마지막 기록입니다. (총 {history.length}개)
+                  </span>
+                )}
+              </div>
           </div>
         )}
       </main>

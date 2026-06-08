@@ -55,6 +55,7 @@ export default function ExercisePage() {
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
   const [history, setHistory] = useState<ExerciseRecord[]>([]);
+  const [visibleCount, setVisibleCount] = useState(5);
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
     exerciseType: 'running' as ExerciseType,
@@ -65,7 +66,7 @@ export default function ExercisePage() {
   const [editModal, setEditModal] = useState<{open: boolean; item: ExerciseRecord | null}>({open: false, item: null});
   const [editForm, setEditForm] = useState({ date: '', exerciseType: 'running' as ExerciseType, duration: '', calories: '', content: '' });
 
-  useSwipeNavigate('/diet', '/chat');
+  useSwipeNavigate('/diet', undefined);
 
   useEffect(() => {
     checkAuth();
@@ -319,13 +320,13 @@ export default function ExercisePage() {
         </div>
 
         {activeTab === 'list' ? (
-          <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+          <div className="bg-white rounded-3xl shadow-sm border border-slate-100">
             {history.length === 0 ? (
               <div className="p-8 text-center text-slate-400">
                 기록된 운동 데이터가 없습니다.
               </div>
             ) : (
-              <div className="overflow-x-auto">
+              <><div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
                   <thead className="bg-slate-50 text-slate-500 font-medium">
                     <tr>
@@ -337,7 +338,7 @@ export default function ExercisePage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
-                    {history.map((item) => {
+                    {history.slice(0, visibleCount).map((item) => {
                       const match = item.content.match(/시간: (\d+)분/);
                       const caloriesMatch = item.content.match(/소모 칼로리: (\d+)kcal/);
                       const duration = match ? match[1] : '';
@@ -374,6 +375,13 @@ export default function ExercisePage() {
                   </tbody>
                 </table>
               </div>
+              {visibleCount < history.length && (
+                <div className="p-3 text-center border-t border-slate-100">
+                  <button onClick={() => setVisibleCount(prev => prev + 5)} className="text-sm text-orange-500 hover:text-orange-700 font-medium">
+                    더보기
+                  </button>
+                </div>
+              )}</>
             )}
           </div>
         ) : (

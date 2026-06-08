@@ -25,7 +25,7 @@ function ChatContent() {
   const [chatHistory, setChatHistory] = useState<any[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  useSwipeNavigate('/exercise', '/');
+  useSwipeNavigate(undefined, '/blood-pressure');
 
   useEffect(() => {
     setMounted(true);

@@ -54,7 +54,7 @@ export default function ProfilePage() {
           <div className="flex justify-center mb-6">
             <div className="w-24 h-24 bg-blue-100 rounded-full flex items-center justify-center overflow-hidden">
               {user?.image ? (
-                <img src={user.image} alt="profile" className="w-24 h-24 object-cover" />
+                <img src={user.image} alt="profile" referrerPolicy="no-referrer" className="w-24 h-24 object-cover" />
               ) : (
                 <User size={40} className="text-blue-600" />
               )}

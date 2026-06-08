@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Header from '../components/Header';
 import Navigation from '@/components/Navigation';
 import { useSwipeNavigate } from '../components/useSwipeNavigate';
-import { Heart, Calendar, Save, List, Plus, Edit2, Trash2, X } from 'lucide-react';
+import { Heart, Calendar, Save, List, Plus, Edit2, Trash2, X, Copy } from 'lucide-react';
 import Link from 'next/link';
 import { useAuthStore } from '@/store/authStore';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
@@ -22,8 +22,9 @@ export default function BloodPressurePage() {
   const [fetching, setFetching] = useState(false);
   const [editModal, setEditModal] = useState<{open: boolean; item: any | null}>({open: false, item: null});
   const [editForm, setEditForm] = useState({ systolic: '', diastolic: '' });
+  const [visibleCount, setVisibleCount] = useState(5);
 
-  useSwipeNavigate(undefined, '/blood-sugar');
+  useSwipeNavigate('/chat', '/blood-sugar');
 
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
@@ -284,9 +285,12 @@ try {
               </div>
             )}
             
-            <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
-              <div className="p-5 border-b border-slate-50 flex justify-between items-center">
+            <div className="bg-white rounded-3xl shadow-sm border border-slate-100">
+              <div className="p-5 border-b border-slate-50 flex justify-between items-center overflow-hidden rounded-t-3xl">
                 <h3 className="font-bold flex items-center gap-2"><Heart size={18} className="text-red-500" /> 혈압 기록</h3>
+                <button className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition" title="클립보드에 복사">
+                  <Copy size={15} />
+                </button>
               </div>
               {fetching ? (
                 <div className="p-8 text-center text-slate-400"> loading...</div>
@@ -295,7 +299,7 @@ try {
                   기록된 혈압 데이터가 없습니다.
                 </div>
               ) : (
-                <div className="overflow-x-auto">
+                <><div className="overflow-x-auto">
                   <table className="w-full text-left text-sm">
                     <thead className="bg-slate-50 text-slate-500 font-medium">
                       <tr>
@@ -306,7 +310,7 @@ try {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
-                      {history.map((item, i) => (
+                      {history.slice(0, visibleCount).map((item, i) => (
                         <tr key={i} className="hover:bg-slate-50/50 transition">
                           <td className="p-4 font-medium">{item.date} {item.formattedTime}</td>
                           <td className="p-4 text-blue-600 font-bold">{item.systolic}</td>
@@ -332,6 +336,22 @@ try {
                     </tbody>
                   </table>
                 </div>
+                              {/* 수정된 더보기 영역 */}
+              <div className="p-4 text-center border-t border-slate-100 bg-slate-50/30 rounded-b-3xl">
+                {visibleCount < history.length ? (
+                  <button 
+                    onClick={() => setVisibleCount(prev => prev + 5)} 
+                    className="text-sm text-blue-600 hover:text-blue-800 font-bold py-2 px-6 hover:bg-blue-50 rounded-xl transition"
+                  >
+                    더보기 ({(history.length - visibleCount) > 5 ? 5 : history.length - visibleCount}개 남음)
+                  </button>
+                ) : (
+                  <span className="text-sm text-slate-400 font-medium">
+                    마지막 기록입니다. (총 {history.length}개)
+                  </span>
+                )}
+              </div>
+            </>
               )}
             </div>
           </div>

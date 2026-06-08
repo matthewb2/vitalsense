@@ -20,6 +20,7 @@ export default function BloodSugarPage() {
   const [error, setError] = useState('');
   const [history, setHistory] = useState<any[]>([]);
   const [fetching, setFetching] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(5);
 
   useSwipeNavigate('/blood-pressure', '/bmi');
 
@@ -171,8 +172,8 @@ export default function BloodSugarPage() {
               </div>
             )}
             
-            <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
-              <div className="p-5 border-b border-slate-50 flex justify-between items-center">
+            <div className="bg-white rounded-3xl shadow-sm border border-slate-100">
+              <div className="p-5 border-b border-slate-50 flex justify-between items-center overflow-hidden rounded-t-3xl">
                 <h3 className="font-bold flex items-center gap-2"><Droplets size={18} className="text-blue-500" /> 혈당 기록</h3>
               </div>
               {fetching ? (
@@ -182,7 +183,7 @@ export default function BloodSugarPage() {
                   기록된 혈당 데이터가 없습니다.
                 </div>
               ) : (
-                <div className="overflow-x-auto">
+                <><div className="overflow-x-auto">
                   <table className="w-full text-left text-sm">
                     <thead className="bg-slate-50 text-slate-500 font-medium">
                       <tr>
@@ -192,7 +193,7 @@ export default function BloodSugarPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
-                      {history.map((item, i) => (
+                      {history.slice(0, visibleCount).map((item, i) => (
                         <tr key={i} className="hover:bg-slate-50/50 transition">
                           <td className="p-4 font-medium">{item.date}</td>
                           <td className="p-4 text-blue-600 font-bold">{item.sugar} mg/dL</td>
@@ -202,6 +203,13 @@ export default function BloodSugarPage() {
                     </tbody>
                   </table>
                 </div>
+                {visibleCount < history.length && (
+                  <div className="p-3 text-center border-t border-slate-100">
+                    <button onClick={() => setVisibleCount(prev => prev + 5)} className="text-sm text-blue-500 hover:text-blue-700 font-medium">
+                      더보기
+                    </button>
+                  </div>
+                )}</>
               )}
             </div>
           </div>

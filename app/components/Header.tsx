@@ -28,12 +28,12 @@ export default function Header({ title }: { title?: string }) {
   const isMainPage = pathname === '/';
 
   const navItems = [    
+    { href: '/chat', icon: MessageCircle, label: 'AI상담' },
     { href: '/blood-pressure', icon: Heart, label: '혈압' },
     { href: '/blood-sugar', icon: Droplets, label: '혈당' },
     { href: '/bmi', icon: Calculator, label: 'BMI' },
     { href: '/diet', icon: Utensils, label: '식단' },
     { href: '/exercise', icon: Dumbbell, label: '운동' },
-    { href: '/chat', icon: MessageCircle, label: 'AI상담' },
   ];
 
   useEffect(() => {
@@ -58,9 +58,9 @@ export default function Header({ title }: { title?: string }) {
           <div className="bg-blue-600 p-1.5 sm:p-2 rounded-lg">
             <HeartPulse className="text-white w-5 h-5 sm:w-6 sm:h-6" />
           </div>
-          <div className="hidden sm:block">
+          <div>
             <h1 className="text-lg sm:text-2xl font-bold text-slate-800 leading-none tracking-tight">{title || '바이탈센스'}</h1>
-            <p className="text-[8px] sm:text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Big Data Health AI</p>
+            <p className="hidden sm:block text-[8px] sm:text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Big Data Health AI</p>
           </div>
         </Link>
 
@@ -79,7 +79,7 @@ export default function Header({ title }: { title?: string }) {
               <Link href="/profile" className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-full shadow-sm border border-slate-200 hover:border-blue-300 transition">
                 <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center overflow-hidden">
                   {userImage ? (
-                    <img src={userImage} alt="profile" className="w-6 h-6 rounded-full object-cover" />
+                    <img src={userImage} alt="profile" referrerPolicy="no-referrer" className="w-6 h-6 rounded-full object-cover" />
                   ) : (
                     <User size={14} className="text-blue-600" />
                   )}
