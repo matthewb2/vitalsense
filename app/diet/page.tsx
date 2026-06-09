@@ -216,7 +216,7 @@ const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
       const data = await response.json();
       if (data.ok && data.item) {
         const userId = user?._id;
-        const filtered = data.item.filter((item: any) => item.user?._id === userId);
+        const filtered = data.item.filter((item: any) => item.extra?.userId === userId || item.user?._id === userId);
         const parsed = filtered.map((item: any) => {
           let mealType = item.extra?.mealType || 'other';
           if (mealType === 'other' && item.title) {

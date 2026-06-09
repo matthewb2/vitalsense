@@ -79,7 +79,7 @@ export default function BmiPage() {
 
       if (data.ok && data.item) {
         const userId = user?._id;
-        const filtered = data.item.filter((item: any) => item.user?._id === userId);
+        const filtered = data.item.filter((item: any) => item.extra?.userId === userId || item.user?._id === userId);
 
         const parsed = filtered.map((item: any) => {
           const contentMatch = item.content.match(/체중: ([\d.]+)kg/);
@@ -188,10 +188,7 @@ export default function BmiPage() {
       <Header />
       
       <main className="max-w-2xl mx-auto mt-6">
-        <Link href="/" className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-700 mb-4">
-          <ArrowLeft size={20} /> 메인으로
-        </Link>
-
+        
         <div className="bg-white rounded-3xl shadow-xl border border-slate-100 overflow-hidden">
           <div className="bg-gradient-to-r from-purple-500 to-indigo-500 p-6 text-white text-center">
             <h2 className="text-xl font-bold flex items-center justify-center gap-2">

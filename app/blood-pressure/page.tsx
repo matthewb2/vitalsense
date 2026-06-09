@@ -39,8 +39,8 @@ export default function BloodPressurePage() {
     }
   }, [user?._id, token]);
 
-  const fetchHistory = async () => {
-    setFetching(true);
+  const fetchHistory = async (silent = false) => {
+    if (!silent) setFetching(true);
     try {
       const response = await fetch(`${API_URL}?type=bp`, {
         method: 'GET',
@@ -50,70 +50,57 @@ export default function BloodPressurePage() {
         },
       });
       const data = await response.json();
-console.log('Blood pressure history response:', data);
+      console.log('Blood pressure history response:', data);
         
-        if (data.ok && data.item) {
-          const userId = user?._id;
-          const filtered = data.item.filter((item: any) => item.user?._id === userId);
-          console.log('Filtered items:', filtered);
+      if (data.ok && data.item) {
+        const userId = user?._id;
+        const filtered = data.item.filter((item: any) => item.extra?.userId === userId || item.user?._id === userId);
+        console.log('Filtered items:', filtered);
           
-const formatTime = (dateTime: string) => {
-            console.log('Raw dateTime:', dateTime);
-            const match = dateTime.match(/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})/);
-            if (!match) return dateTime;
-            const hour = parseInt(match[4]);
-            const minute = match[5];
-            const ampm = hour >= 12 ? '오후' : '오전';
-            const hour12 = hour % 12 || 12;
-            return `${ampm} ${hour12}:${minute}`;
+        const parsed = filtered.map((item: any) => {
+          const contentMatch = item.content.match(/수축기 혈압: (\d+)mmHg\n확장기 혈압: (\d+)mmHg/);
+          const dateTimeMatch = item.content.match(/측정 일시: (.+)/);
+          const fullDateTime = dateTimeMatch ? dateTimeMatch[1] : '';
+          
+          let dateOnly = '';
+          let timeOnly = '';
+          
+          if (fullDateTime) {
+            const parts = fullDateTime.trim().split(/[\s\n]+/);
+            dateOnly = parts[0] || '';
+            timeOnly = parts[1] || '';
+          }
+          
+          let formattedTime = '';
+          if (timeOnly) {
+            const timeMatch = timeOnly.match(/(\d+):(\d+)/);
+            if (timeMatch) {
+              const hour = parseInt(timeMatch[1]);
+              const minute = timeMatch[2];
+              const ampm = hour >= 12 ? '오후' : '오전';
+              const hour12 = hour % 12 || 12;
+              formattedTime = `${ampm} ${hour12}:${minute}`;
+            }
+          }
+          
+          return {
+            _id: item._id,
+            date: dateOnly,
+            time: timeOnly,
+            formattedTime: formattedTime,
+            systolic: contentMatch ? contentMatch[1] : '',
+            diastolic: contentMatch ? contentMatch[2] : '',
+            rawContent: item.content // 백업용 원본 content 저장
           };
-          
-          const parsed = filtered.map((item: any) => {
-            const contentMatch = item.content.match(/수축기 혈압: (\d+)mmHg\n확장기 혈압: (\d+)mmHg/);
-            const dateTimeMatch = item.content.match(/측정 일시: (.+)/);
-            const fullDateTime = dateTimeMatch ? dateTimeMatch[1] : '';
-            
-            // Extract date and time - handle various formats
-            let dateOnly = '';
-            let timeOnly = '';
-            
-            if (fullDateTime) {
-              // Try to split by space or newline
-              const parts = fullDateTime.split(/[\s\n]+/);
-              dateOnly = parts[0] || '';
-              timeOnly = parts[1] || '';
-            }
-            
-            // Format time if available
-            let formattedTime = '';
-            if (timeOnly) {
-              const timeMatch = timeOnly.match(/(\d+):(\d+)/);
-              if (timeMatch) {
-                const hour = parseInt(timeMatch[1]);
-                const minute = timeMatch[2];
-                const ampm = hour >= 12 ? '오후' : '오전';
-                const hour12 = hour % 12 || 12;
-                formattedTime = `${ampm} ${hour12}:${minute}`;
-              }
-            }
-            
-            return {
-              _id: item._id,
-              date: dateOnly,
-              time: timeOnly,
-              formattedTime: formattedTime,
-              systolic: contentMatch ? contentMatch[1] : '',
-              diastolic: contentMatch ? contentMatch[2] : '',
-            };
-          });
-          
-          console.log('Parsed history:', parsed);
-          setHistory(parsed);
-        }
+        });
+        
+        console.log('Parsed history:', parsed);
+        setHistory(parsed);
+      }
     } catch (err) {
       console.error('Error fetching history:', err);
     } finally {
-      setFetching(false);
+      if (!silent) setFetching(false);
     }
   };
 
@@ -122,15 +109,8 @@ const formatTime = (dateTime: string) => {
     setLoading(true);
     setError('');
 
-    console.log('Current user:', user);
-    console.log('User ID:', user?._id);
-    console.log('User Name:', user?.name);
-    console.log('User accessToken:', user?.accessToken);
-
-try {
+    try {
       console.log('=== Blood Pressure Submit ===');
-      console.log('User:', user);
-      console.log('Token:', token);
       
       const response = await fetch(API_URL, {
         method: 'POST',
@@ -147,20 +127,13 @@ try {
         }),
       });
 
-      console.log('Authorization header sent:', `Bearer ${token}`);
-      console.log('Response status:', response.status);
       const data = await response.json();
-      console.log('Response data:', data);
 
       if (data.ok) {
         setSaved(true);
-        const newRecord = {
-          date: formData.date,
-          time: formData.time,
-          systolic: formData.systolic,
-          diastolic: formData.diastolic,
-        };
-        setHistory([newRecord, ...history]);
+        // 새 데이터 등록 시 더보기 카운트를 기본값으로 리셋하여 싱크를 맞춥니다.
+        setVisibleCount(5);
+        await fetchHistory(true);
         setFormData({ date: new Date().toISOString().split('T')[0], time: new Date().toTimeString().slice(0, 5), systolic: '', diastolic: '' });
         setTimeout(() => {
           setSaved(false);
@@ -172,7 +145,7 @@ try {
     } catch (err) {
       setError('오류가 발생했습니다.');
     } finally {
-      setLoading(false);
+      loading && setLoading(false);
     }
   };
 
@@ -195,7 +168,11 @@ try {
       const data = await response.json();
       
       if (data.ok) {
-        setHistory(history.filter(h => h._id !== item._id));
+        // 데이터 삭제 시 visibleCount 조절 (남은 데이터 개수가 줄어들므로 초과 방지)
+        if (history.length - 1 <= visibleCount && visibleCount > 5) {
+          setVisibleCount(prev => Math.max(5, prev - 5));
+        }
+        fetchHistory(true);
       } else {
         setError(data.message || '삭제에 실패했습니다.');
       }
@@ -209,6 +186,7 @@ try {
     setLoading(true);
     
     try {
+      // 파싱 실패를 방지하기 위해 정규식 매칭용 포맷 규칙 그대로 재조립하여 전송합니다.
       const response = await fetch(API_URL, {
         method: 'PATCH',
         headers: {
@@ -226,11 +204,7 @@ try {
       const data = await response.json();
       
       if (data.ok) {
-        setHistory(history.map(h => 
-          h._id === editModal.item._id 
-            ? { ...h, systolic: editForm.systolic, diastolic: editForm.diastolic }
-            : h
-        ));
+        await fetchHistory(true);
         setEditModal({ open: false, item: null });
       } else {
         setError(data.message || '수정에 실패했습니다.');
@@ -241,65 +215,72 @@ try {
       setLoading(false);
     }
   };
+// ... 상단 코드는 그대로 유지하고 return 문 내부만 아래와 같이 수정합니다.
 
-  return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 ">
-      <Header />
-      
-      <main className="max-w-4xl mx-auto mt-6">
-        <div className="flex bg-white p-1.5 rounded-2xl shadow-sm mb-8 w-fit mx-auto border border-slate-200">
-          <TabButton 
-            active={activeTab === 'list'} 
-            onClick={() => setActiveTab('list')} 
-            icon={<List size={18} />} 
-            label="기록 목록" 
-          />
-          <TabButton 
-            active={activeTab === 'record'} 
-            onClick={() => setActiveTab('record')} 
-            icon={<Plus size={18} />} 
-            label="수치 기록" 
-          />
-        </div>
+return (
+  <div className="min-h-screen bg-slate-50 text-slate-900 ">
+    <Header />
+    
+    <main className="max-w-4xl mx-auto mt-6">
+      <div className="flex bg-white p-1.5 rounded-2xl shadow-sm mb-8 w-fit mx-auto border border-slate-200">
+        <TabButton 
+          active={activeTab === 'list'} 
+          onClick={() => setActiveTab('list')} 
+          icon={<List size={18} />} 
+          label="기록 목록" 
+        />
+        <TabButton 
+          active={activeTab === 'record'} 
+          onClick={() => setActiveTab('record')} 
+          icon={<Plus size={18} />} 
+          label="수치 기록" 
+        />
+      </div>
 
-        {activeTab === 'list' ? (
-          <div className="space-y-4">
-            {history.length > 0 && (
-              <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-4">
-                <h3 className="font-bold flex items-center gap-2 mb-4"><Heart size={18} className="text-red-500" /> 혈압 추이</h3>
-                <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={[...history].reverse()} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                      <XAxis dataKey="date" tick={{ fontSize: 12 }} stroke="#94a3b8" />
-                      <YAxis domain={['auto', 'auto']} tick={{ fontSize: 12 }} stroke="#94a3b8" />
-                      <Tooltip 
-                        contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0' }}
-                      />
-                      <Legend />
-                      <Line type="monotone" dataKey="systolic" name="수축기" stroke="#3b82f6" strokeWidth={2} dot={{ r: 4 }} />
-                      <Line type="monotone" dataKey="diastolic" name="이완기" stroke="#10b981" strokeWidth={2} dot={{ r: 4 }} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
+      {activeTab === 'list' ? (
+        <div className="space-y-4">
+          {history.length > 0 && (
+            <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-4">
+              <h3 className="font-bold flex items-center gap-2 mb-4">
+                <Heart size={18} className="text-red-500" /> 혈압 추이
+              </h3>
+              {/* ResponsiveContainer 오류 방지를 위해 부모 w-full 및 min-w-0 확보 */}
+              <div className="h-64 w-full min-w-0">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+                  <LineChart data={[...history].reverse()} margin={{ top: 5, right: 20, left: -25, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                    <XAxis dataKey="date" tick={{ fontSize: 12 }} stroke="#94a3b8" />
+                    <YAxis domain={['auto', 'auto']} tick={{ fontSize: 12 }} stroke="#94a3b8" />
+                    <Tooltip 
+                      contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0' }}
+                    />
+                    <Legend />
+                    <Line type="monotone" dataKey="systolic" name="수축기" stroke="#3b82f6" strokeWidth={2} dot={{ r: 4 }} />
+                    <Line type="monotone" dataKey="diastolic" name="이완기" stroke="#10b981" strokeWidth={2} dot={{ r: 4 }} />
+                  </LineChart>
+                </ResponsiveContainer>
               </div>
-            )}
-            
-            <div className="bg-white rounded-3xl shadow-sm border border-slate-100">
-              <div className="p-5 border-b border-slate-50 flex justify-between items-center overflow-hidden rounded-t-3xl">
-                <h3 className="font-bold flex items-center gap-2"><Heart size={18} className="text-red-500" /> 혈압 기록</h3>
-                <button className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition" title="클립보드에 복사">
-                  <Copy size={15} />
-                </button>
+            </div>
+          )}
+          
+          <div className="bg-white rounded-3xl shadow-sm border border-slate-100">
+            <div className="p-5 border-b border-slate-50 flex justify-between items-center overflow-hidden rounded-t-3xl">
+              <h3 className="font-bold flex items-center gap-2">
+                <Heart size={18} className="text-red-500" /> 혈압 기록
+              </h3>
+              <button className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition" title="클립보드에 복사">
+                <Copy size={15} />
+              </button>
+            </div>
+            {fetching ? (
+              <div className="p-8 text-center text-slate-400"> loading...</div>
+            ) : history.length === 0 ? (
+              <div className="p-8 text-center text-slate-400">
+                기록된 혈압 데이터가 없습니다.
               </div>
-              {fetching ? (
-                <div className="p-8 text-center text-slate-400"> loading...</div>
-              ) : history.length === 0 ? (
-                <div className="p-8 text-center text-slate-400">
-                  기록된 혈압 데이터가 없습니다.
-                </div>
-              ) : (
-                <><div className="overflow-x-auto">
+            ) : (
+              <>
+                <div className="overflow-x-auto">
                   <table className="w-full text-left text-sm">
                     <thead className="bg-slate-50 text-slate-500 font-medium">
                       <tr>
@@ -311,7 +292,7 @@ try {
                     </thead>
                     <tbody className="divide-y divide-slate-50">
                       {history.slice(0, visibleCount).map((item, i) => (
-                        <tr key={i} className="hover:bg-slate-50/50 transition">
+                        <tr key={item._id || i} className="hover:bg-slate-50/50 transition">
                           <td className="p-4 font-medium">{item.date} {item.formattedTime}</td>
                           <td className="p-4 text-blue-600 font-bold">{item.systolic}</td>
                           <td className="p-4 text-emerald-600 font-bold">{item.diastolic}</td>
@@ -336,26 +317,28 @@ try {
                     </tbody>
                   </table>
                 </div>
-                              {/* 수정된 더보기 영역 */}
-              <div className="p-4 text-center border-t border-slate-100 bg-slate-50/30 rounded-b-3xl">
-                {visibleCount < history.length ? (
-                  <button 
-                    onClick={() => setVisibleCount(prev => prev + 5)} 
-                    className="text-sm text-blue-600 hover:text-blue-800 font-bold py-2 px-6 hover:bg-blue-50 rounded-xl transition"
-                  >
-                    더보기 ({(history.length - visibleCount) > 5 ? 5 : history.length - visibleCount}개 남음)
-                  </button>
-                ) : (
-                  <span className="text-sm text-slate-400 font-medium">
-                    마지막 기록입니다. (총 {history.length}개)
-                  </span>
-                )}
-              </div>
-            </>
-              )}
-            </div>
+
+                {/* 남은 개수 계산 방어코드 적용된 더보기 영역 */}
+                <div className="p-4 text-center border-t border-slate-100 bg-slate-50/30 rounded-b-3xl">
+                  {visibleCount < history.length ? (
+                    <button 
+                      onClick={() => setVisibleCount(prev => prev + 5)} 
+                      className="text-sm text-blue-600 hover:text-blue-800 font-bold py-2 px-6 hover:bg-blue-50 rounded-xl transition"
+                    >
+                      더보기 ({(history.length - visibleCount) > 5 ? 5 : (history.length - visibleCount)}개 남음)
+                    </button>
+                  ) : (
+                    <span className="text-sm text-slate-400 font-medium">
+                      마지막 기록입니다. (총 {history.length}개)
+                    </span>
+                  )}
+                </div>
+              </>
+            )}
           </div>
-        ) : (
+        </div>
+      ) : (
+        // ... 하단 혈압 기록 추가 폼 코드는 기존과 동일하게 유지됩니다.
           <div className="bg-white rounded-3xl shadow-xl border border-slate-100 max-w-lg mx-auto overflow-hidden">
             <div className="bg-blue-600 p-6 text-white text-center">
               <h2 className="text-xl font-bold">혈압 기록 추가</h2>

@@ -61,7 +61,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ ok: 0, message: 'type 파라미터가 필요합니다.' }, { status: 400 });
     }
 
-    const response = await fetch(`${API_URL}?type=${type}&sort=_id,-1`, {
+    const response = await fetch(`${API_URL}?type=${type}&limit=100&sort=_id,-1`, {
       method: 'GET',
       headers: {
         'client-id': 'vitalsense',

@@ -51,7 +51,7 @@ export default function BloodSugarPage() {
       
       if (data.ok && data.item) {
         const userId = user?._id;
-        const filtered = data.item.filter((item: any) => item.user?._id === userId);
+        const filtered = data.item.filter((item: any) => item.extra?.userId === userId || item.user?._id === userId);
         console.log('Filtered items:', filtered);
         
         const parsed = filtered.map((item: any) => {
