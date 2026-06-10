@@ -27,16 +27,23 @@ interface AuthState {
   refreshToken: () => Promise<boolean>;
 }
 
-// 토큰이 만료되었는지 확인하는 함수
 const isTokenExpired = (token: string): boolean => {
   try {
-    const base64Url = token.split('.')[1];
+    const parts = token.split('.');
+    if (parts.length !== 3) {
+      console.debug('[Auth] Token is not a JWT, assuming valid');
+      return false;
+    }
+    const base64Url = parts[1];
     const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
     const payload = JSON.parse(window.atob(base64));
     const now = Math.floor(Date.now() / 1000);
-    return payload.exp < now;
+    const expired = payload.exp < now;
+    console.debug('[Auth] JWT exp check:', new Date(payload.exp * 1000).toISOString(), 'now:', new Date(now * 1000).toISOString(), 'expired:', expired);
+    return expired;
   } catch (e) {
-    return true;
+    console.debug('[Auth] Token parse error, assuming valid');
+    return false;
   }
 };
 
@@ -45,16 +52,26 @@ export const useAuthStore = create<AuthState>()(
     (set, get) => ({
       user: null,
       isLoggedIn: false,
-      setUser: (user) => set({ user, isLoggedIn: !!user }),
+      setUser: (user) => {
+        console.debug('[Auth] setUser:', user ? `{_id: ${user._id}, name: ${user.name}, hasAccess: ${!!user.accessToken || !!user.token?.accessToken}, hasRefresh: ${!!user.token?.refreshToken}}` : 'null');
+        set({ user, isLoggedIn: !!user });
+      },
       logout: () => {
+        console.debug('[Auth] logout');
         set({ user: null, isLoggedIn: false });
       },
       refreshToken: async () => {
         const { user, logout } = get();
         const refreshToken = user?.token?.refreshToken;
-        
+        const currentAccessToken = user?.accessToken || user?.token?.accessToken;
+
+        console.debug('[Auth] refreshToken called', {
+          hasRefreshToken: !!refreshToken,
+          hasAccessToken: !!currentAccessToken,
+        });
+
         if (!refreshToken) {
-          console.log('refreshToken이 없습니다.');
+          console.debug('[Auth] refreshToken 없음, 로그아웃');
           logout();
           return false;
         }
@@ -65,12 +82,14 @@ export const useAuthStore = create<AuthState>()(
             headers: {
               'Content-Type': 'application/json',
               'client-id': 'vitalsense',
+              ...(currentAccessToken ? { 'Authorization': `Bearer ${currentAccessToken}` } : {}),
             },
             body: JSON.stringify({ refreshToken }),
           });
-          
+
           const data = await response.json();
-          
+          console.debug('[Auth] Refresh API response:', data);
+
           if (data.ok && data.item?.token?.accessToken) {
             const updatedUser = {
               ...user,
@@ -82,37 +101,48 @@ export const useAuthStore = create<AuthState>()(
               accessToken: data.item.token.accessToken,
             };
             set({ user: updatedUser, isLoggedIn: true });
-            console.log('토큰 갱신 성공');
+            console.debug('[Auth] 토큰 갱신 성공');
             return true;
           } else {
-            console.log('토큰 갱신 실패:', data.message);
+            console.debug('[Auth] 토큰 갱신 실패:', data.message);
             logout();
             return false;
           }
         } catch (err) {
-          console.error('토큰 갱신 오류:', err);
+          console.error('[Auth] 토큰 갱신 오류:', err);
           logout();
           return false;
         }
       },
       checkAuth: async () => {
-        const { user, logout, refreshToken } = get();
+        const { user, refreshToken } = get();
         const accessToken = user?.accessToken || user?.token?.accessToken;
 
+        console.debug('[Auth] checkAuth:', {
+          hasUser: !!user,
+          userId: user?._id,
+          hasAccessToken: !!accessToken,
+          hasRefreshToken: !!user?.token?.refreshToken,
+          isLoggedIn: get().isLoggedIn,
+        });
+
         if (accessToken) {
-          if (isTokenExpired(accessToken)) {
-            console.log('accessToken이 만료되었습니다. refresh 시도...');
+          const expired = isTokenExpired(accessToken);
+          if (expired) {
+            console.debug('[Auth] accessToken 만료, refresh 시도...');
             const refreshed = await refreshToken();
             if (!refreshed) {
-              console.log('refresh 실패, 로그아웃 처리');
+              console.debug('[Auth] refresh 실패, 로그아웃');
             }
           } else {
+            console.debug('[Auth] accessToken 유효, 로그인 유지');
             set({ isLoggedIn: true });
           }
         } else if (user?.token?.refreshToken) {
-          console.log('accessToken이 없고 refreshToken만 있습니다. 갱신 시도...');
+          console.debug('[Auth] accessToken 없음, refreshToken으로 갱신 시도...');
           await refreshToken();
         } else {
+          console.debug('[Auth] 사용자 정보 없음, 로그아웃 상태');
           set({ isLoggedIn: false });
         }
       },

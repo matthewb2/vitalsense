@@ -177,7 +177,7 @@ const data = await response.json();
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 p-4 relative">
+    <div className="min-h-screen bg-slate-50 text-slate-900">
       {loading && (
         <div className="absolute inset-0 bg-white/80 backdrop-blur-sm z-50 flex items-center justify-center">
           <div className="flex flex-col items-center gap-4">
@@ -189,14 +189,7 @@ const data = await response.json();
       <Header />
 
       <main className="max-w-md mx-auto mt-10">
-        <Link
-          href="/"
-          className="inline-flex items-center gap-2 text-slate-500 hover:text-blue-600 mb-4"
-        >
-          <ArrowLeft size={20} />
-          메인으로
-        </Link>
-
+        
         <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-8">
           <div className="flex justify-center mb-6">
             <div className="bg-blue-600 p-4 rounded-2xl">

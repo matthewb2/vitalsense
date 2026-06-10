@@ -240,14 +240,14 @@ return (
       {activeTab === 'list' ? (
         <div className="space-y-4">
           {history.length > 0 && (
-            <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-4">
+            <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-4 mx-4">
               <h3 className="font-bold flex items-center gap-2 mb-4">
                 <Heart size={18} className="text-red-500" /> 혈압 추이
               </h3>
               {/* ResponsiveContainer 오류 방지를 위해 부모 w-full 및 min-w-0 확보 */}
               <div className="h-64 w-full min-w-0">
                 <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-                  <LineChart data={[...history].reverse()} margin={{ top: 5, right: 20, left: -25, bottom: 5 }}>
+                  <LineChart data={[...history].slice(0, 10).reverse()} margin={{ top: 5, right: 20, left: -25, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                     <XAxis dataKey="date" tick={{ fontSize: 12 }} stroke="#94a3b8" />
                     <YAxis domain={['auto', 'auto']} tick={{ fontSize: 12 }} stroke="#94a3b8" />
@@ -263,7 +263,7 @@ return (
             </div>
           )}
           
-          <div className="bg-white rounded-3xl shadow-sm border border-slate-100">
+          <div className="bg-white rounded-3xl shadow-sm border border-slate-100 mx-4">
             <div className="p-5 border-b border-slate-50 flex justify-between items-center overflow-hidden rounded-t-3xl">
               <h3 className="font-bold flex items-center gap-2">
                 <Heart size={18} className="text-red-500" /> 혈압 기록
@@ -325,7 +325,7 @@ return (
                       onClick={() => setVisibleCount(prev => prev + 5)} 
                       className="text-sm text-blue-600 hover:text-blue-800 font-bold py-2 px-6 hover:bg-blue-50 rounded-xl transition"
                     >
-                      더보기 ({(history.length - visibleCount) > 5 ? 5 : (history.length - visibleCount)}개 남음)
+                      ({(history.length - visibleCount) > 5 ? 5 : (history.length - visibleCount)}개 더보기)
                     </button>
                   ) : (
                     <span className="text-sm text-slate-400 font-medium">

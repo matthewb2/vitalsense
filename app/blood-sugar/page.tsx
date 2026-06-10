@@ -36,8 +36,8 @@ export default function BloodSugarPage() {
     }
   }, [user?._id, token]);
 
-  const fetchHistory = async () => {
-    setFetching(true);
+  const fetchHistory = async (silent = false) => {
+    if (!silent) setFetching(true);
     try {
       const response = await fetch(`${API_URL}?type=blood-sugar`, {
         method: 'GET',
@@ -73,7 +73,7 @@ export default function BloodSugarPage() {
     } catch (err) {
       console.error('Error fetching history:', err);
     } finally {
-      setFetching(false);
+      if (!silent) setFetching(false);
     }
   };
 
@@ -111,12 +111,8 @@ export default function BloodSugarPage() {
 
       if (data.ok) {
         setSaved(true);
-        const newRecord = {
-          date: formData.date,
-          sugar: formData.sugar,
-          time: formData.time,
-        };
-        setHistory([newRecord, ...history]);
+        setVisibleCount(5);
+        await fetchHistory(true);
         setFormData({ date: new Date().toISOString().split('T')[0], sugar: '', time: '공복' });
         setTimeout(() => {
           setSaved(false);
@@ -136,7 +132,7 @@ export default function BloodSugarPage() {
     <div className="min-h-screen bg-slate-50 text-slate-900 ">
       <Header />
       
-      <main className="max-w-4xl mx-auto mt-6">
+      <main className="max-w-4xl mx-auto mt-6 ml-4 mr-4">
         <div className="flex bg-white p-1.5 rounded-2xl shadow-sm mb-8 w-fit mx-auto border border-slate-200">
           <TabButton 
             active={activeTab === 'list'} 
@@ -159,7 +155,7 @@ export default function BloodSugarPage() {
                 <h3 className="font-bold flex items-center gap-2 mb-4"><Droplets size={18} className="text-blue-500" /> 혈당 추이</h3>
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={[...history].reverse()} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                    <LineChart data={[...history].slice(0, 10).reverse()} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                       <XAxis dataKey="date" tick={{ fontSize: 12 }} stroke="#94a3b8" />
                       <YAxis domain={['auto', 'auto']} tick={{ fontSize: 12 }} stroke="#94a3b8" />
@@ -203,13 +199,20 @@ export default function BloodSugarPage() {
                     </tbody>
                   </table>
                 </div>
-                {visibleCount < history.length && (
-                  <div className="p-3 text-center border-t border-slate-100">
-                    <button onClick={() => setVisibleCount(prev => prev + 5)} className="text-sm text-blue-500 hover:text-blue-700 font-medium">
-                      더보기
+                <div className="p-4 text-center border-t border-slate-100 bg-slate-50/30 rounded-b-3xl">
+                  {visibleCount < history.length ? (
+                    <button 
+                      onClick={() => setVisibleCount(prev => prev + 5)} 
+                      className="text-sm text-blue-600 hover:text-blue-800 font-bold py-2 px-6 hover:bg-blue-50 rounded-xl transition"
+                    >
+  ({(history.length - visibleCount) > 5 ? 5 : (history.length - visibleCount)}개 더보기)
                     </button>
-                  </div>
-                )}</>
+                  ) : (
+                    <span className="text-sm text-slate-400 font-medium">
+                      마지막 기록입니다. (총 {history.length}개)
+                    </span>
+                  )}
+                </div></>
               )}
             </div>
           </div>

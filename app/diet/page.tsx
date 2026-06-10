@@ -67,6 +67,24 @@ export default function DietPage() {
   const [analysisResults, setAnalysisResults] = useState<{food_name: string; calories: number}[]>([]);
   const [totalCalories, setTotalCalories] = useState(0);
   const [imageIndexMap, setImageIndexMap] = useState<Record<number, number>>({});
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+
+  const handleDownload = async (url: string) => {
+    try {
+      const res = await fetch(`/api/proxy-image?url=${encodeURIComponent(url)}`);
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = 'vitalsense-image.jpg';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      console.error('Download failed:', err);
+    }
+  };
 
 // Groq API 이미지 분석 함수
   const analyzeImage = async (base64Image: string): Promise<{food_name: string; calories: number} | null> => {
@@ -203,8 +221,8 @@ const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     }
   }, [user?._id, user?.token]);
 
-  const fetchHistory = async (token: string) => {
-    setHistoryLoading(true);
+  const fetchHistory = async (token: string, silent = false) => {
+    if (!silent) setHistoryLoading(true);
     try {
       const response = await fetch(`${API_URL}?type=diet`, {
         method: 'GET',
@@ -238,7 +256,7 @@ const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     } catch (err) {
       console.error('Error fetching history:', err);
     } finally {
-      setHistoryLoading(false);
+      if (!silent) setHistoryLoading(false);
     }
   };
 
@@ -502,7 +520,19 @@ const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
                       const currentIdx = imageIndexMap[item._id] || 0;
                       const src = getImageUrl(images[currentIdx]);
                       return (
-                        <div className="mb-3 rounded-xl overflow-hidden relative group">
+                        <div className="mb-3 rounded-xl overflow-hidden relative group cursor-pointer" onClick={() => setLightboxImage(src)}
+                          onTouchStart={(e) => { const t = e.touches[0]; (e.currentTarget as any).__sx = t.clientX; (e.currentTarget as any).__sy = t.clientY; }}
+                          onTouchEnd={(e) => {
+                            if (images.length < 2) return;
+                            const t = e.changedTouches[0];
+                            const dx = t.clientX - ((e.currentTarget as any).__sx ?? t.clientX);
+                            const dy = t.clientY - ((e.currentTarget as any).__sy ?? t.clientY);
+                            if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+                              if (dx < 0 && currentIdx < images.length - 1) setImageIndexMap(p => ({ ...p, [item._id]: currentIdx + 1 }));
+                              if (dx > 0 && currentIdx > 0) setImageIndexMap(p => ({ ...p, [item._id]: currentIdx - 1 }));
+                            }
+                          }}
+                        >
                           {images.length > 1 && (
                             <>
                               {currentIdx > 0 && (
@@ -551,13 +581,21 @@ const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
                   </div>
                 ))}
               </div>
-              {visibleCount < history.length && (
-                <div className="text-center pt-2">
-                  <button onClick={() => setVisibleCount(prev => prev + 5)} className="text-sm text-green-500 hover:text-green-700 font-medium">
-                    더보기
+              {visibleCount < history.length ? (
+                <div className="text-center pt-4">
+                  <button onClick={() => setVisibleCount(prev => prev + 5)} 
+                    className="text-sm text-green-600 hover:text-green-800 font-bold py-2 px-6 hover:bg-green-50 rounded-xl transition"
+                  >
+                      ({(history.length - visibleCount) > 5 ? 5 : (history.length - visibleCount)}개 더보기)
                   </button>
                 </div>
-              )}</>
+              ) : history.length > 0 ? (
+                <div className="text-center pt-4">
+                  <span className="text-sm text-slate-400 font-medium">
+                    마지막 기록입니다. (총 {history.length}개)
+                  </span>
+                </div>
+              ) : null}</>
             )}
           </div>
         ) : (
@@ -659,6 +697,23 @@ const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
           onSave={handleUpdate}
           onImageChange={handleEditImageChange}
         />
+
+        {/* 라이트박스 */}
+        {lightboxImage && (
+          <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onClick={() => setLightboxImage(null)}>
+            <div className="relative max-w-2xl w-full max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+              <Image src={lightboxImage} alt="preview" width={800} height={600} className="w-full h-auto max-h-[80vh] object-contain rounded-2xl" />
+              <div className="absolute top-4 right-4 flex gap-2">
+                <button onClick={() => handleDownload(lightboxImage)} className="bg-white/20 backdrop-blur-sm text-white rounded-full p-2 hover:bg-white/40 transition" title="다운로드">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                </button>
+                <button onClick={() => setLightboxImage(null)} className="bg-white/20 backdrop-blur-sm text-white rounded-full p-2 hover:bg-white/40 transition" title="닫기">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );

@@ -65,14 +65,16 @@ export default function Header({ title }: { title?: string }) {
         </Link>
 
         <div className="flex items-center gap-2 md:gap-4">
-          <div className="flex items-center gap-2">
-            <IconButton icon={<Bell size={20} />} onClick={() => alert('알림이 없습니다.')} />
-            <Link href="/settings">
-              <IconButton icon={<Settings size={20} />} onClick={() => {}} />
-            </Link>
-          </div>
+          {isLoggedIn && (
+            <div className="flex items-center gap-2">
+              <IconButton icon={<Bell size={20} />} onClick={() => alert('알림이 없습니다.')} />
+              <Link href="/settings">
+                <IconButton icon={<Settings size={20} />} onClick={() => {}} />
+              </Link>
+            </div>
+          )}
 
-          <div className="h-6 w-[1px] bg-slate-200 mx-1"></div>
+          {isLoggedIn && <div className="h-6 w-[1px] bg-slate-200 mx-1"></div>}
 
           {isLoggedIn ? (
             <div className="flex items-center gap-3">

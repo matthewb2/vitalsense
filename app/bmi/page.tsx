@@ -187,7 +187,7 @@ export default function BmiPage() {
     <div className="min-h-screen bg-slate-50 text-slate-900 ">
       <Header />
       
-      <main className="max-w-2xl mx-auto mt-6">
+      <main className="max-w-2xl mx-auto mt-6 ml-4 mr-4">
         
         <div className="bg-white rounded-3xl shadow-xl border border-slate-100 overflow-hidden">
           <div className="bg-gradient-to-r from-purple-500 to-indigo-500 p-6 text-white text-center">
@@ -266,8 +266,8 @@ export default function BmiPage() {
           <div className="mt-6 bg-white rounded-3xl shadow-sm border border-slate-100 p-4">
             <h3 className="font-bold flex items-center gap-2 mb-4"><Activity size={18} className="text-purple-500" /> BMI 변화 추이</h3>
             <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+              <ResponsiveContainer width="100%" height="100%">              
+                 <LineChart data={[...chartData].slice(0, 10).reverse()} margin={{ top: 5, right: 20, left: -25, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                   <XAxis dataKey="date" tick={{ fontSize: 12 }} stroke="#94a3b8" />
                   <YAxis domain={['auto', 'auto']} tick={{ fontSize: 12 }} stroke="#94a3b8" />
@@ -315,7 +315,7 @@ export default function BmiPage() {
                     onClick={() => setVisibleCount(prev => prev + 5)} 
                     className="text-sm text-blue-600 hover:text-blue-800 font-bold py-2 px-6 hover:bg-blue-50 rounded-xl transition"
                   >
-                    더보기 ({(history.length - visibleCount) > 5 ? 5 : history.length - visibleCount}개 남음)
+                      ({(history.length - visibleCount) > 5 ? 5 : (history.length - visibleCount)}개 더보기)
                   </button>
                 ) : (
                   <span className="text-sm text-slate-400 font-medium">
