@@ -520,7 +520,7 @@ const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
                       const currentIdx = imageIndexMap[item._id] || 0;
                       const src = getImageUrl(images[currentIdx]);
                       return (
-                        <div className="mb-3 rounded-xl overflow-hidden relative group cursor-pointer" onClick={() => setLightboxImage(src)}
+                        <div data-no-page-swipe className="mb-3 rounded-xl overflow-hidden relative group cursor-pointer" onClick={() => setLightboxImage(src)}
                           onTouchStart={(e) => { const t = e.touches[0]; (e.currentTarget as any).__sx = t.clientX; (e.currentTarget as any).__sy = t.clientY; }}
                           onTouchEnd={(e) => {
                             if (images.length < 2) return;

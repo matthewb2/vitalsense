@@ -12,6 +12,7 @@ export function useSwipeNavigate(leftHref?: string, rightHref?: string) {
     const handleTouchStart = (e: TouchEvent) => {
       const target = e.target as HTMLElement;
       if (target.closest('header')) return;
+      if (target.closest('[data-no-page-swipe]')) return;
       
       touchStartX.current = e.touches[0].clientX;
       touchStartY.current = e.touches[0].clientY;
@@ -19,6 +20,9 @@ export function useSwipeNavigate(leftHref?: string, rightHref?: string) {
 
     const handleTouchEnd = (e: TouchEvent) => {
       if (touchStartX.current === null || touchStartY.current === null) return;
+
+      const target = e.target as HTMLElement;
+      if (target.closest('[data-no-page-swipe]')) return;
 
       const touchEndX = e.changedTouches[0].clientX;
       const touchEndY = e.changedTouches[0].clientY;
