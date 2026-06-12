@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import Header from '../components/Header';
 import Navigation from '@/components/Navigation';
 import { useSwipeNavigate } from '../components/useSwipeNavigate';
-import { Activity, Calculator, Ruler, Scale, ArrowLeft } from 'lucide-react';
+import { Activity, Calculator, Ruler, Scale, ArrowLeft, Edit2, Trash2, X } from 'lucide-react';
 import Link from 'next/link';
 import { useAuthStore } from '@/store/authStore';
 import {
@@ -40,6 +40,8 @@ export default function BmiPage() {
   const [saved, setSaved] = useState(false);
   const [visibleCount, setVisibleCount] = useState(5);
   const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [editModal, setEditModal] = useState<{open: boolean; item: HistoryItem | null}>({open: false, item: null});
+  const [editForm, setEditForm] = useState({ height: '', weight: '' });
 
   useSwipeNavigate('/blood-sugar', '/diet');
 
@@ -66,7 +68,8 @@ export default function BmiPage() {
     }
   }, [user?._id, user?.token]);
 
-  const fetchHistory = async (token: string) => {
+  const fetchHistory = async (token: string, silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const response = await fetch(`${API_URL}?type=bmi`, {
         method: 'GET',
@@ -100,6 +103,8 @@ export default function BmiPage() {
       }
     } catch (err) {
       console.error('Error fetching history:', err);
+    } finally {
+      if (!silent) setLoading(false);
     }
   };
 
@@ -111,6 +116,61 @@ export default function BmiPage() {
       const heightM = height / 100;
       const bmi = weight / (heightM * heightM);
       setCalculatedBmi(bmi);
+    }
+  };
+
+  const handleEdit = (item: HistoryItem) => {
+    setEditModal({ open: true, item });
+    setEditForm({ height: item.height, weight: item.weight });
+  };
+
+  const handleDelete = async (item: HistoryItem) => {
+    if (!confirm('이 기록을 삭제하시겠습니까?')) return;
+    const currentToken = user?.token?.accessToken || user?.accessToken;
+    if (!currentToken) return;
+    try {
+      await fetch(`${API_URL}?id=${item._id}`, {
+        method: 'DELETE',
+        headers: {
+          'client-id': 'vitalsense',
+          'Authorization': `Bearer ${currentToken}`
+        },
+      });
+      const token = user?.token?.accessToken || user?.accessToken;
+      if (token) fetchHistory(token, true);
+    } catch (err) {
+      console.error('Error deleting:', err);
+    }
+  };
+
+  const handleUpdate = async () => {
+    if (!editModal.item) return;
+    setLoading(true);
+    const currentToken = user?.token?.accessToken || user?.accessToken;
+    if (!currentToken) { setLoading(false); return; }
+    try {
+      const bmi = calculateBmiFinal(parseFloat(editForm.height), parseFloat(editForm.weight));
+      await fetch(API_URL, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'client-id': 'vitalsense',
+          'Authorization': `Bearer ${currentToken}`
+        },
+        body: JSON.stringify({
+          id: editModal.item._id,
+          type: 'bmi',
+          title: `BMI 기록 - ${bmi} (${editForm.height}cm, ${editForm.weight}kg)`,
+          content: `측정 일시: ${editModal.item.date}\n신장: ${editForm.height}cm\n체중: ${editForm.weight}kg\nBMI: ${bmi}`,
+        }),
+      });
+      setEditModal({ open: false, item: null });
+      const token = user?.token?.accessToken || user?.accessToken;
+      if (token) fetchHistory(token, true);
+    } catch (err) {
+      console.error('Error updating:', err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -176,8 +236,7 @@ export default function BmiPage() {
   const bmiStatus = calculatedBmi ? getBmiStatus(calculatedBmi) : null;
 
   const chartData = useMemo(() => {
-    const sorted = [...history].sort((a, b) => a.date.localeCompare(b.date));
-    return sorted.map(item => ({
+    return [...history].slice(0, 10).reverse().map(item => ({
       date: item.date.slice(5),
       bmi: parseFloat(item.bmi),
     }));
@@ -295,16 +354,26 @@ export default function BmiPage() {
                     <th className="p-4">날짜</th>
                     <th className="p-4">체중</th>
                     <th className="p-4">BMI</th>
+                    <th className="p-4">관리</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                  {history.slice(0, visibleCount).map((item) => (
+                  {loading ? (
+                    <tr><td colSpan={4} className="p-8 text-center text-slate-400"> loading...</td></tr>
+                  ) : (
+                    history.slice(0, visibleCount).map((item) => (
                     <tr key={item._id} className="hover:bg-slate-50/50 transition">
                       <td className="p-4 font-medium">{item.date}</td>
                       <td className="p-4">{item.weight} kg</td>
                       <td className="p-4 text-purple-600 font-bold">{item.bmi}</td>
+                      <td className="p-4">
+                        <div className="flex gap-2">
+                          <button onClick={() => handleEdit(item)} className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition"><Edit2 size={16} /></button>
+                          <button onClick={() => handleDelete(item)} className="p-2 text-red-400 hover:bg-red-50 rounded-lg transition"><Trash2 size={16} /></button>
+                        </div>
+                      </td>
                     </tr>
-                  ))}
+                    )))}
                 </tbody>
               </table>
             </div>
@@ -323,6 +392,36 @@ export default function BmiPage() {
                   </span>
                 )}
               </div>
+          </div>
+        )}
+
+        {/* 수정 모달 */}
+        {editModal.open && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden">
+              <div className="p-4 border-b flex justify-between items-center">
+                <h3 className="font-bold">BMI 기록 수정</h3>
+                <button onClick={() => setEditModal({open: false, item: null})} className="p-2 hover:bg-slate-100 rounded-full"><X size={20} /></button>
+              </div>
+              <div className="p-6 space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-slate-600">신장 (cm)</label>
+                    <input type="number" step="0.1" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-purple-500 font-mono"
+                      value={editForm.height} onChange={(e) => setEditForm({...editForm, height: e.target.value})} />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-slate-600">체중 (kg)</label>
+                    <input type="number" step="0.1" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-purple-500 font-mono"
+                      value={editForm.weight} onChange={(e) => setEditForm({...editForm, weight: e.target.value})} />
+                  </div>
+                </div>
+                <button type="button" onClick={handleUpdate} disabled={loading}
+                  className="w-full py-3 bg-purple-500 text-white font-bold rounded-xl hover:bg-purple-600 transition disabled:opacity-50">
+                  {loading ? '저장 중...' : '수정하기'}
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </main>

@@ -510,7 +510,7 @@ const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
                     <div className="flex justify-between items-center mb-3">
                       <span className="text-sm font-medium text-slate-500">{item.date}</span>
                       <span className={`px-2 py-1 rounded-full text-xs font-bold ${mealColors[item.mealType]}`}>
-                        {mealLabels[item.mealType]}
+                        {mealLabels[item.mealType]}{item.calories ? ` · ${item.calories}kcal` : ''}
                       </span>
                     </div>
                     
@@ -566,12 +566,7 @@ const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
                     })()}
                     
                     {/* 메뉴 */}
-                    <p className="text-slate-700 mb-2">{item.content.split('\n')[1]?.split(': ')[1] || ''}</p>
-                    
-                    {/* 칼로리 */}
-                    {item.calories && (
-                      <p className="text-sm text-green-600 font-semibold mb-3 flex items-center gap-1"><Flame size={14} /> {item.calories} kcal</p>
-                    )}
+                    <p className="text-slate-700 mb-3">{item.content.split('\n')[1]?.split(': ')[1] || ''}</p>
                     
                     {/* 하단: 관리 버튼 */}
                     <div className="flex gap-2 pt-2 border-t border-slate-100">

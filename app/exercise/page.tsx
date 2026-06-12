@@ -354,7 +354,7 @@ export default function ExercisePage() {
                         <tr key={item._id} className="hover:bg-slate-50/50 transition">
                           <td className="p-4 font-medium">{item.date}</td>
                           <td className="p-4">
-                            <span className={`px-3 py-1 rounded-full text-xs font-bold ${exerciseColors[item.exerciseType as ExerciseType]}`}>
+                            <span className={`px-3 py-1 rounded-full text-[0.6rem] font-bold ${exerciseColors[item.exerciseType as ExerciseType]}`}>
                               {exerciseLabels[item.exerciseType as ExerciseType]}
                             </span>
                           </td>

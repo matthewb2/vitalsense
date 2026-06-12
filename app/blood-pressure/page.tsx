@@ -23,6 +23,21 @@ export default function BloodPressurePage() {
   const [editModal, setEditModal] = useState<{open: boolean; item: any | null}>({open: false, item: null});
   const [editForm, setEditForm] = useState({ systolic: '', diastolic: '' });
   const [visibleCount, setVisibleCount] = useState(5);
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    const latest = history.slice(0, 5).map(item => ({
+      date: item.date,
+      time: item.time,
+      systolic: item.systolic,
+      diastolic: item.diastolic,
+    }));
+    const json = JSON.stringify(latest, null, 2);
+    navigator.clipboard.writeText(json).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
 
   useSwipeNavigate('/chat', '/blood-sugar');
 
@@ -268,8 +283,13 @@ return (
               <h3 className="font-bold flex items-center gap-2">
                 <Heart size={18} className="text-red-500" /> 혈압 기록
               </h3>
-              <button className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition" title="클립보드에 복사">
+              <button onClick={handleCopy} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition relative" title="클립보드에 복사">
                 <Copy size={15} />
+                {copied && (
+                  <span className="absolute -top-1 right-full mr-2 text-[10px] bg-blue-600 text-white px-2 py-0.5 rounded-full whitespace-nowrap shadow">
+                    복사됨
+                  </span>
+                )}
               </button>
             </div>
             {fetching ? (
