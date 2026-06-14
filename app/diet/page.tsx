@@ -234,20 +234,29 @@ const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
       const data = await response.json();
       if (data.ok && data.item) {
         const userId = user?._id;
-        const filtered = data.item.filter((item: any) => item.extra?.userId === userId || item.user?._id === userId);
+        const parseExtra = (item: any) => {
+          if (typeof item.extra === 'string') { try { return JSON.parse(item.extra); } catch { return {}; } }
+          return item.extra || {};
+        };
+        const filtered = data.item.filter((item: any) => {
+          const ex = parseExtra(item);
+          return ex.userId === userId || item.user?._id === userId;
+        });
         const parsed = filtered.map((item: any) => {
-          let mealType = item.extra?.mealType || 'other';
+          const extra = parseExtra(item);
+          let mealType = extra.mealType || 'other';
           if (mealType === 'other' && item.title) {
             if (item.title.startsWith('아침')) mealType = 'breakfast';
             else if (item.title.startsWith('점심')) mealType = 'lunch';
             else if (item.title.startsWith('저녁')) mealType = 'dinner';
           }
+          const contentCalories = item.content.match(/칼로리:\s*(\d+)kcal/);
           return {
             _id: item._id,
             date: item.content.split('측정 일시: ')[1]?.split('\n')[0] || '',
             mealType: mealType,
             content: item.content,
-            calories: item.extra?.calories?.toString() || '',
+            calories: extra.calories?.toString() || (contentCalories ? contentCalories[1] : ''),
             image: item.image || null,
           };
         });

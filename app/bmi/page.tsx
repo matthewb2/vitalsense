@@ -82,7 +82,11 @@ export default function BmiPage() {
 
       if (data.ok && data.item) {
         const userId = user?._id;
-        const filtered = data.item.filter((item: any) => item.extra?.userId === userId || item.user?._id === userId);
+        const parseExtra = (item: any) => { if (typeof item.extra === 'string') { try { return JSON.parse(item.extra); } catch { return {}; } } return item.extra || {}; };
+        const filtered = data.item.filter((item: any) => {
+          const ex = parseExtra(item);
+          return ex.userId === userId || item.user?._id === userId;
+        });
 
         const parsed = filtered.map((item: any) => {
           const contentMatch = item.content.match(/체중: ([\d.]+)kg/);
@@ -326,7 +330,7 @@ export default function BmiPage() {
             <h3 className="font-bold flex items-center gap-2 mb-4"><Activity size={18} className="text-purple-500" /> BMI 변화 추이</h3>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">              
-                 <LineChart data={[...chartData].slice(0, 10).reverse()} margin={{ top: 5, right: 20, left: -25, bottom: 5 }}>
+                 <LineChart data={[...chartData].slice(0, 10)} margin={{ top: 5, right: 20, left: -25, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                   <XAxis dataKey="date" tick={{ fontSize: 12 }} stroke="#94a3b8" />
                   <YAxis domain={['auto', 'auto']} tick={{ fontSize: 12 }} stroke="#94a3b8" />

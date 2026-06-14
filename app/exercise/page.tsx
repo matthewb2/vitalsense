@@ -96,10 +96,15 @@ export default function ExercisePage() {
 
       if (data.ok && data.item) {
         const userId = user?._id;
-        const filtered = data.item.filter((item: any) => item.extra?.userId === userId || item.user?._id === userId);
+        const parseExtra = (item: any) => { if (typeof item.extra === 'string') { try { return JSON.parse(item.extra); } catch { return {}; } } return item.extra || {}; };
+        const filtered = data.item.filter((item: any) => {
+          const ex = parseExtra(item);
+          return ex.userId === userId || item.user?._id === userId;
+        });
 
         const parsed = filtered.map((item: any) => {
-          let exerciseType = item.extra?.exerciseType || 'other';
+          const ex = parseExtra(item);
+          let exerciseType = ex.exerciseType || 'other';
           
           if (exerciseType === 'other' && item.title) {
             if (item.title.startsWith('러닝')) exerciseType = 'running';

@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Settings, User, LogOut, Bell, HeartPulse, Home, Heart, Droplets, Calculator, Utensils, Dumbbell, MessageCircle } from 'lucide-react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
 
 interface IconButtonProps {
@@ -27,6 +27,10 @@ export default function Header({ title }: { title?: string }) {
   const pathname = usePathname();
   const isMainPage = pathname === '/';
 
+  // 스크롤 동기화를 위한 Ref 생성
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const itemRefs = useRef<(HTMLAnchorElement | null)[]>([]);
+
   const navItems = [    
     { href: '/chat', icon: MessageCircle, label: 'AI상담' },
     { href: '/blood-pressure', icon: Heart, label: '혈압' },
@@ -35,6 +39,23 @@ export default function Header({ title }: { title?: string }) {
     { href: '/diet', icon: Utensils, label: '식단' },
     { href: '/exercise', icon: Dumbbell, label: '운동' },
   ];
+
+  // 현재 활성화된 메뉴 아이템의 인덱스 확인
+  const activeIndex = navItems.findIndex(item => item.href === pathname);
+
+  // pathname(페이지) 변경 시 활성화된 메뉴를 스크롤 중앙으로 이동
+  useEffect(() => {
+    if (activeIndex !== -1) {
+      const activeTarget = itemRefs.current[activeIndex];
+      if (activeTarget) {
+        activeTarget.scrollIntoView({
+          behavior: 'smooth', // 부드럽게 이동
+          block: 'nearest',   // 상하 스크롤은 그대로 유지
+          inline: 'center',   // 좌우 축 기준 '가운데' 정렬
+        });
+      }
+    }
+  }, [activeIndex]);
 
   useEffect(() => {
     checkAuth();
@@ -111,13 +132,18 @@ export default function Header({ title }: { title?: string }) {
       {/* 3. 하단 레이아웃: 메인 페이지가 아닐 때 로고 '아래에' 한 줄로 깔끔하게 떨어지는 네비게이션 */}
       {!isMainPage && (
         <nav className="border-t border-slate-50 px-4 sm:px-8 py-2.5 bg-slate-50/50">
-          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
-            {navItems.map((item) => {
+          <div 
+            ref={scrollContainerRef}
+            className="flex items-center gap-1.5 overflow-x-auto no-scrollbar"
+            style={{ WebkitOverflowScrolling: 'touch' }} // 모바일 기기에서의 매끄러운 스크롤 터치감 부여
+          >
+            {navItems.map((item, index) => {
               const isActive = pathname === item.href;
               return (
                 <Link
                   key={item.href}
                   href={item.href}
+                  ref={(el) => { itemRefs.current[index] = el; }} // 중괄호를 추가하여 반환값 없이 할당만 수행
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-semibold whitespace-nowrap transition-all ${
                     isActive
                       ? 'bg-blue-600 text-white shadow-sm'

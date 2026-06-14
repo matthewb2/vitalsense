@@ -148,6 +148,7 @@ function ChatContent() {
       setLoading(false);
     }
   };
+
   return (
     <div className="h-[100dvh] w-full bg-white flex flex-col overflow-hidden">
       <Header title="바이탈센스 AI" />
@@ -193,50 +194,50 @@ function ChatContent() {
         {messages.map((msg, i) => (
           <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div
-  className={`max-w-[90%] p-4 rounded-2xl whitespace-pre-wrap ${
-    msg.role === 'user'
-      ? 'bg-blue-600 text-white text-lg'
-      : 'bg-slate-100 text-slate-800'
-  }`}
->
-  {msg.role === 'user' ? (
-    msg.content
-  ) : (
-    <div className="prose max-w-none text-lg">
-      <ReactMarkdown
-        components={{
-          p: ({ children }) => (
-            <p className="text-lg leading-relaxed mb-4">
-              {children}
-            </p>
-          ),
-          li: ({ children }) => (
-            <li className="text-lg leading-relaxed">
-              {children}
-            </li>
-          ),
-          h1: ({ children }) => (
-            <h1 className="text-3lg font-bold mb-4">
-              {children}
-            </h1>
-          ),
-          h2: ({ children }) => (
-            <h2 className="text-2lg font-bold mb-3">
-              {children}
-            </h2>
-          ),
-          h3: ({ children }) => (
-            <h3 className="text-lg font-bold mb-2">
-              {children}
-            </h3>
-          ),
-        }}
-      >
-        {msg.content}
-      </ReactMarkdown>
-    </div>
-  )}
-</div>
+              className={`max-w-[90%] p-4 rounded-2xl whitespace-pre-wrap ${
+                msg.role === 'user'
+                  ? 'bg-blue-600 text-white text-lg'
+                  : 'bg-slate-100 text-slate-800'
+              }`}
+            >
+              {msg.role === 'user' ? (
+                msg.content
+              ) : (
+                <div className="prose max-w-none text-lg">
+                  <ReactMarkdown
+                    components={{
+                      p: ({ children }) => (
+                        <p className="text-lg leading-relaxed mb-4">
+                          {children}
+                        </p>
+                      ),
+                      li: ({ children }) => (
+                        <li className="text-lg leading-relaxed">
+                          {children}
+                        </li>
+                      ),
+                      h1: ({ children }) => (
+                        <h1 className="text-3lg font-bold mb-4">
+                          {children}
+                        </h1>
+                      ),
+                      h2: ({ children }) => (
+                        <h2 className="text-2lg font-bold mb-3">
+                          {children}
+                        </h2>
+                      ),
+                      h3: ({ children }) => (
+                        <h3 className="text-lg font-bold mb-2">
+                          {children}
+                        </h3>
+                      ),
+                    }}
+                  >
+                    {msg.content}
+                  </ReactMarkdown>
+                </div>
+              )}
+            </div>
           </div>
         ))}
         {loading && (
@@ -249,12 +250,12 @@ function ChatContent() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* 하단 입력창 */}
-      <div className="flex-shrink-0 sticky bg-white border-t px-4 py-4 bottom-0">
+      {/* 하단 입력창 (수정됨: sticky 및 bottom-0 제거, 모바일 safe-area 대응 마진 추가 가능) */}
+      <div className="flex-shrink-0 bg-white border-t px-4 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
         <div className="w-full max-w-3xl mx-auto flex items-center gap-2">
           <button 
             onClick={() => { fetchChatHistory(); setShowHistory(true); }}
-            className="p-4 text-slate-500 hover:text-blue-600 hover:bg-slate-100 rounded-2xl transition"
+            className="p-2 text-slate-500 hover:text-blue-600 hover:bg-slate-100 rounded-2xl transition"
             title="이전 질문 보기"
           >
             <History size={20} />
