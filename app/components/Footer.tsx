@@ -20,6 +20,15 @@ export default function Footer() {
           
 
           <div className="flex flex-wrap justify-center gap-4 text-sm">
+          
+            <Link href="/notices" className="text-slate-500 hover:text-blue-600 transition-colors">
+              공지사항
+            </Link>
+            <span className="text-slate-300">|</span>
+            <Link href="/inquiries" className="text-slate-500 hover:text-blue-600 transition-colors">
+              이용문의
+            </Link>
+            <span className="text-slate-300">|</span>
             <Link href="/terms" className="text-slate-500 hover:text-blue-600 transition-colors">
               이용약관
             </Link>
@@ -30,7 +39,7 @@ export default function Footer() {
           </div>
 
           <div className="text-xs text-slate-400">
-            © {currentYear} VitalSense AI. All rights reserved.
+            © {currentYear} VitalSense. All rights reserved.
           </div>
         </div>
       </div>

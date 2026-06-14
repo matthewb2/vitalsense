@@ -24,6 +24,10 @@ function ChatContent() {
   const [showHistory, setShowHistory] = useState(false);
   const [chatHistory, setChatHistory] = useState<any[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  // 1. 컴포넌트 상단에 ref와 상태(Height) 추가
+const containerRef = useRef<HTMLDivElement>(null);
+const [viewportHeight, setViewportHeight] = useState('100dvh');
+  
 
   useSwipeNavigate(undefined, '/blood-pressure');
 
@@ -69,6 +73,31 @@ function ChatContent() {
       fetchChatHistory();
     }
   }, [mounted, isLoggedIn]);
+  
+  // 2. 키보드 리사이즈를 감지하는 useEffect 추가
+useEffect(() => {
+  if (typeof window === 'undefined' || !window.visualViewport) return;
+
+  const handleResize = () => {
+    if (window.visualViewport) {
+      // 키보드가 올라오면 visualViewport.height가 작아집니다.
+      setViewportHeight(`${window.visualViewport.height}px`);
+      
+      // 키보드가 올라왔을 때 입력창이 가려지지 않도록 스크롤을 맨 아래로 강제 이동
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
+    }
+  };
+
+  window.visualViewport.addEventListener('resize', handleResize);
+  window.visualViewport.addEventListener('scroll', handleResize);
+
+  return () => {
+    window.visualViewport?.removeEventListener('resize', handleResize);
+    window.visualViewport?.removeEventListener('scroll', handleResize);
+  };
+}, []);
 
   const handleHistoryClick = (content: string) => {
     setInput(content);
@@ -150,8 +179,11 @@ function ChatContent() {
   };
 
   return (
-    <div className="h-[100dvh] w-full bg-white flex flex-col overflow-hidden">
-      <Header title="바이탈센스 AI" />
+    <div 
+    ref={containerRef}
+    style={{ height: viewportHeight }}
+    className="w-full bg-white flex flex-col overflow-hidden fixed inset-0">
+    <Header title="바이탈센스" />
       
       {/* 히스토리 패널 */}
       {showHistory && (
@@ -250,32 +282,44 @@ function ChatContent() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* 하단 입력창 (수정됨: sticky 및 bottom-0 제거, 모바일 safe-area 대응 마진 추가 가능) */}
+      {/* 하단 입력창 */}
       <div className="flex-shrink-0 bg-white border-t px-4 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
-        <div className="w-full max-w-3xl mx-auto flex items-center gap-2">
-          <button 
-            onClick={() => { fetchChatHistory(); setShowHistory(true); }}
-            className="p-2 text-slate-500 hover:text-blue-600 hover:bg-slate-100 rounded-2xl transition"
-            title="이전 질문 보기"
-          >
-            <History size={20} />
-          </button>
-          <input 
-            type="text"
+        <div className="w-full max-w-3xl mx-auto relative">
+          <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSendMessage();
+              }
+            }}
             placeholder="건강에 대해 질문하세요..."
-            className="flex-1 min-w-0 p-4 bg-slate-100 border-0 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-lg"
+            className="w-full p-4 pb-14 bg-slate-100 border-0 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-lg resize-none"
             disabled={loading}
+            rows={1}
+            onInput={(e) => {
+              const el = e.currentTarget;
+              el.style.height = 'auto';
+              el.style.height = Math.min(el.scrollHeight, 240) + 'px';
+            }}
           />
-          <button 
-            onClick={handleSendMessage} 
-            disabled={loading || !input.trim()}
-            className="min-w-0 p-4 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition disabled:opacity-50"
-          >
-            <Send size={24} />
-          </button>
+          <div className="absolute bottom-3 right-3 flex items-center gap-1">
+            <button
+              onClick={() => { fetchChatHistory(); setShowHistory(true); }}
+              className="p-2 text-slate-400 hover:text-blue-600 hover:bg-slate-200 rounded-xl transition"
+              title="이전 질문 보기"
+            >
+              <History size={20} />
+            </button>
+            <button
+              onClick={handleSendMessage}
+              disabled={loading || !input.trim()}
+              className="p-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition disabled:opacity-50"
+            >
+              <Send size={20} />
+            </button>
+          </div>
         </div>
       </div>
     </div>
