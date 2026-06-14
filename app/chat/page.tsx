@@ -297,12 +297,7 @@ useEffect(() => {
             placeholder="건강에 대해 질문하세요..."
             className="w-full p-4 pb-14 bg-slate-100 border-0 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-lg resize-none"
             disabled={loading}
-            rows={1}
-            onInput={(e) => {
-              const el = e.currentTarget;
-              el.style.height = 'auto';
-              el.style.height = Math.min(el.scrollHeight, 240) + 'px';
-            }}
+            rows={Math.min(input.split('\n').length, 4)}
           />
           <div className="absolute bottom-3 right-3 flex items-center gap-1">
             <button
