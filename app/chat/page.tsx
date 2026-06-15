@@ -283,37 +283,39 @@ useEffect(() => {
       </div>
 
       {/* 하단 입력창 */}
-      <div className="flex-shrink-0 bg-white border-t px-4 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
-        <div className="w-full max-w-3xl mx-auto relative">
-          <textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                handleSendMessage();
-              }
-            }}
-            placeholder="건강에 대해 질문하세요..."
-            className="w-full p-4 pb-14 bg-slate-100 border-0 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-lg resize-none"
-            disabled={loading}
-            rows={Math.min(input.split('\n').length, 4)}
-          />
-          <div className="absolute bottom-3 right-3 flex items-center gap-1">
-            <button
-              onClick={() => { fetchChatHistory(); setShowHistory(true); }}
-              className="p-2 text-slate-400 hover:text-blue-600 hover:bg-slate-200 rounded-xl transition"
-              title="이전 질문 보기"
-            >
-              <History size={20} />
-            </button>
-            <button
-              onClick={handleSendMessage}
-              disabled={loading || !input.trim()}
-              className="p-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition disabled:opacity-50"
-            >
-              <Send size={20} />
-            </button>
+      <div className="flex-shrink-0 bg-white">
+        <div className="max-w-3xl mx-auto px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
+          <div className="relative flex items-end gap-0 bg-white border border-slate-200 rounded-2xl shadow-sm focus-within:border-slate-300 focus-within:shadow-md transition-all">
+            <textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSendMessage();
+                }
+              }}
+              placeholder="건강에 대해 질문하세요..."
+              className="flex-1 min-w-0 max-h-48 p-4 bg-transparent border-0 outline-none text-base resize-none"
+              disabled={loading}
+              rows={Math.max(1, Math.min(input.split('\n').length, 8))}
+            />
+            <div className="flex items-center gap-0.5 pr-2 pb-2 shrink-0">
+              <button
+                onClick={() => { fetchChatHistory(); setShowHistory(true); }}
+                className="p-2 text-slate-400 hover:text-slate-600 rounded-xl transition"
+                title="이전 질문 보기"
+              >
+                <History size={20} />
+              </button>
+              <button
+                onClick={handleSendMessage}
+                disabled={loading || !input.trim()}
+                className="p-2.5 bg-black text-white rounded-xl hover:opacity-80 transition disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                <Send size={18} />
+              </button>
+            </div>
           </div>
         </div>
       </div>

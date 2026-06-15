@@ -1,14 +1,59 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import Image from 'next/image';
 import Header from '../components/Header';
 import Navigation from '@/components/Navigation';
 import { useSwipeNavigate } from '../components/useSwipeNavigate';
-import { Dumbbell, Clock, Plus, List, Trash2, ArrowLeft, Flame, Edit2, X } from 'lucide-react';
+import { Dumbbell, Clock, Plus, List, Trash2, ArrowLeft, Flame, Edit2, X, ImagePlus, Camera, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { useAuthStore } from '@/store/authStore';
 
 const API_URL = '/api/posts';
+const IMAGE_HOST_URL = 'http://mksolution.dothome.co.kr/images';
+
+const getImageUrl = (imagePath: string | null | undefined): string | null => {
+  if (!imagePath) return null;
+  if (imagePath.startsWith('data:')) return imagePath;
+  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) return imagePath;
+  return `${IMAGE_HOST_URL}/${imagePath}`;
+};
+
+// 상대 시간을 계산해 주는 헬퍼 함수
+const formatRelativeTime = (dateString: string): string => {
+  if (!dateString) return '';
+  
+  const now = new Date();
+  const past = new Date(dateString);
+  
+  // 날짜 변환이 올바르지 않은 경우 원본 문자열 반환
+  if (isNaN(past.getTime())) return dateString;
+
+  const diffInMilliSeconds = now.getTime() - past.getTime();
+  const diffInSeconds = Math.floor(diffInMilliSeconds / 1000);
+  const diffInMinutes = Math.floor(diffInSeconds / 60);
+  const diffInHours = Math.floor(diffInMinutes / 60);
+  const diffInDays = Math.floor(diffInHours / 24);
+  const diffInWeeks = Math.floor(diffInDays / 7);
+  const diffInMonths = Math.floor(diffInDays / 30);
+  const diffInYears = Math.floor(diffInDays / 365);
+
+  if (diffInSeconds < 60) {
+    return '방금 전';
+  } else if (diffInMinutes < 60) {
+    return `${diffInMinutes}분 전`;
+  } else if (diffInHours < 24) {
+    return `${diffInHours}시간 전`;
+  } else if (diffInDays < 7) {
+    return `${diffInDays}일 전`;
+  } else if (diffInWeeks < 4) {
+    return `${diffInWeeks}주일 전`;
+  } else if (diffInMonths < 12) {
+    return `${diffInMonths}달 전`;
+  } else {
+    return `${diffInYears}년 전`;
+  }
+};
 
 type ExerciseType = 'running' | 'walking' | 'swimming' | 'cycling' | 'weight' | 'yoga' | 'other';
 
@@ -17,6 +62,7 @@ interface ExerciseRecord {
   date: string;
   exerciseType: ExerciseType;
   content: string;
+  image?: string | null;
 }
 
 const exerciseLabels: Record<ExerciseType, string> = {
@@ -63,9 +109,12 @@ export default function ExercisePage() {
     duration: '',
     calories: '',
     content: '',
+    images: [] as string[],
   });
   const [editModal, setEditModal] = useState<{open: boolean; item: ExerciseRecord | null}>({open: false, item: null});
-  const [editForm, setEditForm] = useState({ date: '', exerciseType: 'running' as ExerciseType, duration: '', calories: '', content: '' });
+  const [editForm, setEditForm] = useState({ date: '', exerciseType: 'running' as ExerciseType, duration: '', calories: '', content: '', image: null as string | null });
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+  const [imageIndexMap, setImageIndexMap] = useState<Record<number, number>>({});
 
   useSwipeNavigate('/diet', undefined);
 
@@ -120,6 +169,7 @@ export default function ExercisePage() {
             date: item.content.split('측정 일시: ')[1]?.split('\n')[0] || '',
             exerciseType: exerciseType,
             content: item.content,
+            image: item.image || null,
           };
         });
 
@@ -150,6 +200,51 @@ export default function ExercisePage() {
     setTimeout(calculateCalories, 100);
   };
 
+  const compressImage = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new window.Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          let width = img.width;
+          let height = img.height;
+          const maxDimension = 800;
+          if (width > maxDimension || height > maxDimension) {
+            if (width > height) {
+              height = (height / width) * maxDimension;
+              width = maxDimension;
+            } else {
+              width = (width / height) * maxDimension;
+              height = maxDimension;
+            }
+          }
+          canvas.width = width;
+          canvas.height = height;
+          ctx?.drawImage(img, 0, 0, width, height);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+          resolve(dataUrl);
+        };
+        img.onerror = reject;
+      };
+      reader.onerror = reject;
+    });
+  };
+
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    try {
+      const compressed = await Promise.all(files.map(f => compressImage(f)));
+      setFormData(prev => ({ ...prev, images: [...prev.images, ...compressed] }));
+    } catch (error) {
+      console.error('Image processing error:', error);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.exerciseType || !formData.duration) return;
@@ -169,6 +264,39 @@ export default function ExercisePage() {
       : '';
 
     try {
+      let imagePaths: string[] = [];
+      if (formData.images.length > 0) {
+        for (const img of formData.images) {
+          if (!img.startsWith('data:')) continue;
+          const base64Data = img.split(',')[1];
+          const byteCharacters = atob(base64Data);
+          const byteNumbers = new Array(byteCharacters.length);
+          for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+          }
+          const byteArray = new Uint8Array(byteNumbers);
+          const blob = new Blob([byteArray], { type: 'image/jpeg' });
+
+          const fileFormData = new FormData();
+          fileFormData.append('file', blob, `exercise_${Date.now()}.jpg`);
+
+          const fileResponse = await fetch('/api/files', {
+            method: 'POST',
+            headers: {
+              'client-id': 'vitalsense',
+              'Authorization': `Bearer ${currentToken}`
+            },
+            body: fileFormData,
+          });
+
+          const fileData = await fileResponse.json();
+          const fullPath = fileData.path || fileData.item?.[0]?.path || fileData.url;
+          if (fullPath) {
+            imagePaths.push(fullPath.split('/').pop());
+          }
+        }
+      }
+
       await fetch(API_URL, {
         method: 'POST',
         headers: {
@@ -180,6 +308,7 @@ export default function ExercisePage() {
           type: 'exercise',
           title: `${exerciseLabels[formData.exerciseType as ExerciseType]} - ${formData.duration}분${formData.calories ? ` (${formData.calories}kcal)` : ''}`,
           content: `측정 일시: ${formData.date}\n운동: ${exerciseLabels[formData.exerciseType as ExerciseType]}\n시간: ${formData.duration}분${formData.calories ? `\n소모 칼로리: ${formData.calories}kcal` : ''}${contentText}`,
+          image: imagePaths.length > 0 ? imagePaths.join(',') : null,
           extra: { 
             userId: user?._id, 
             userName: user?.name,
@@ -198,6 +327,7 @@ export default function ExercisePage() {
         duration: '',
         calories: '',
         content: '',
+        images: [],
       });
       
       setTimeout(() => {
@@ -245,6 +375,7 @@ export default function ExercisePage() {
       duration: durationMatch ? durationMatch[1] : '',
       calories: caloriesMatch ? caloriesMatch[1] : '',
       content: contentMatch ? contentMatch[1] : '',
+      image: item.image || null,
     });
     setEditModal({ open: true, item });
   };
@@ -311,7 +442,7 @@ export default function ExercisePage() {
     <div className="min-h-screen bg-slate-50 text-slate-900">
       <Header />     
 
-      <main className="max-w-2xl mx-auto mt-6">
+      <main className="max-w-md mx-auto mt-4">
 
         <div className="flex bg-white p-1.5 rounded-2xl shadow-sm mb-8 w-fit mx-auto border border-slate-200">
           <TabButton
@@ -329,78 +460,114 @@ export default function ExercisePage() {
         </div>
 
         {activeTab === 'list' ? (
-          <div className="bg-white rounded-3xl shadow-sm border border-slate-100">
-            {history.length === 0 ? (
-              <div className="p-8 text-center text-slate-400">
-                기록된 운동 데이터가 없습니다.
+          <div>
+            {fetching ? (
+              <div className="p-8 text-center text-slate-400 flex items-center justify-center gap-2">
+                <Loader2 className="animate-spin" size={20} /> 데이터를 가져오는 중...
               </div>
+            ) : history.length === 0 ? (
+              <div className="p-8 text-center text-slate-400">기록된 운동 데이터가 없습니다.</div>
             ) : (
-              <><div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead className="bg-slate-50 text-slate-500 font-medium">
-                    <tr>
-                      <th className="p-4">날짜</th>
-                      <th className="p-4">종류</th>
-                      <th className="p-4">시간</th>
-                      <th className="p-4">칼로리</th>
-                      <th className="p-4">관리</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50">
-                    {fetching ? (
-                      <tr><td colSpan={5} className="p-8 text-center text-slate-400"> loading...</td></tr>
-                    ) : (
-                      history.slice(0, visibleCount).map((item) => {
-                      const match = item.content.match(/시간: (\d+)분/);
-                      const caloriesMatch = item.content.match(/소모 칼로리: (\d+)kcal/);
-                      const duration = match ? match[1] : '';
-                      const calories = caloriesMatch ? caloriesMatch[1] : '';
-                      return (
-                        <tr key={item._id} className="hover:bg-slate-50/50 transition">
-                          <td className="p-4 font-medium">{item.date}</td>
-                          <td className="p-4">
-                            <span className={`px-3 py-1 rounded-full text-[0.6rem] font-bold ${exerciseColors[item.exerciseType as ExerciseType]}`}>
-                              {exerciseLabels[item.exerciseType as ExerciseType]}
-                            </span>
-                          </td>
-                          <td className="p-4 text-slate-600">{duration ? `${duration}분` : '-'}</td>
-                          <td className="p-4 text-orange-500 font-medium">{calories ? `${calories}kcal` : '-'}</td>
-                          <td className="p-4">
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => handleEdit(item)}
-                                className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition"
-                              >
-                                <Edit2 size={16} />
-                              </button>
-                              <button
-                                onClick={() => handleDelete(item)}
-                                className="p-2 text-red-400 hover:bg-red-50 rounded-lg transition"
-                              >
-                                <Trash2 size={16} />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    }))}
-                  </tbody>
-                </table>
+              <><div className="space-y-4">
+                {history.slice(0, visibleCount).map((item) => {
+                  const match = item.content.match(/시간: (\d+)분/);
+                  const caloriesMatch = item.content.match(/소모 칼로리: (\d+)kcal/);
+                  const contentMatch = item.content.match(/메모: (.+)/);
+                  const duration = match ? match[1] : '';
+                  const calories = caloriesMatch ? caloriesMatch[1] : '';
+                  const memo = contentMatch ? contentMatch[1] : '';
+                  return (
+                    <div key={item._id} className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4">
+                      {/* 상단: 날짜 및 운동 유형 */}
+                      <div className="flex justify-between items-center mb-3">
+                        <span className="text-sm font-medium text-slate-500">{formatRelativeTime(item.date)}</span>
+                        <span className={`px-2 py-1 rounded-full text-xs font-bold ${exerciseColors[item.exerciseType as ExerciseType]}`}>
+                          {exerciseLabels[item.exerciseType as ExerciseType]}{calories ? ` · ${calories}kcal` : ''}
+                        </span>
+                      </div>
+                      
+                      {/* 이미지 (있을 경우) */}
+                      {item.image && (() => {
+                        const images = item.image!.split(',').filter(Boolean);
+                        const currentIdx = imageIndexMap[item._id] || 0;
+                        const src = getImageUrl(images[currentIdx]);
+                        return (
+                          <div data-no-page-swipe className="mb-3 rounded-xl overflow-hidden relative group cursor-pointer" onClick={() => setLightboxImage(src)}
+                            onTouchStart={(e) => { const t = e.touches[0]; (e.currentTarget as any).__sx = t.clientX; (e.currentTarget as any).__sy = t.clientY; }}
+                            onTouchEnd={(e) => {
+                              if (images.length < 2) return;
+                              const t = e.changedTouches[0];
+                              const dx = t.clientX - ((e.currentTarget as any).__sx ?? t.clientX);
+                              const dy = t.clientY - ((e.currentTarget as any).__sy ?? t.clientY);
+                              if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+                                if (dx < 0 && currentIdx < images.length - 1) setImageIndexMap(p => ({ ...p, [item._id]: currentIdx + 1 }));
+                                if (dx > 0 && currentIdx > 0) setImageIndexMap(p => ({ ...p, [item._id]: currentIdx - 1 }));
+                              }
+                            }}
+                          >
+                            {images.length > 1 && (
+                              <>
+                                {currentIdx > 0 && (
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); setImageIndexMap(prev => ({ ...prev, [item._id]: currentIdx - 1 })); }}
+                                    className="absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-black/40 text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition hidden md:block"
+                                  >
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6"/></svg>
+                                  </button>
+                                )}
+                                {currentIdx < images.length - 1 && (
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); setImageIndexMap(prev => ({ ...prev, [item._id]: currentIdx + 1 })); }}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-black/40 text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition hidden md:block"
+                                  >
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6"/></svg>
+                                  </button>
+                                )}
+                                <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-10 flex gap-1.5">
+                                  {images.map((_, dotIdx) => (
+                                    <button key={dotIdx} onClick={(e) => { e.stopPropagation(); setImageIndexMap(prev => ({ ...prev, [item._id]: dotIdx })); }}
+                                      className={`w-2 h-2 rounded-full transition ${dotIdx === currentIdx ? 'bg-white' : 'bg-white/40'}`}
+                                    />
+                                  ))}
+                                </div>
+                              </>
+                            )}
+                            {src && <Image src={src} alt="exercise" width={300} height={200} className="w-full h-48 object-cover" />}
+                          </div>
+                        );
+                      })()}
+                      
+                      {/* 운동 상세 */}
+                      <div className="space-y-1 mb-3">
+                        {duration && <p className="text-slate-700"><span className="font-medium">시간:</span> {duration}분</p>}
+                        {calories && <p className="text-orange-500 font-medium"><span className="font-medium text-slate-700">칼로리:</span> {calories}kcal</p>}
+                        {memo && <p className="text-slate-600 text-sm">{memo}</p>}
+                      </div>
+                      
+                      {/* 하단: 관리 버튼 */}
+                      <div className="flex gap-2 pt-2 border-t border-slate-100">
+                        <button onClick={() => handleEdit(item)} className="flex-1 py-2 text-blue-500 hover:bg-blue-50 rounded-lg transition text-sm font-medium">수정</button>
+                        <button onClick={() => handleDelete(item)} className="flex-1 py-2 text-red-400 hover:bg-red-50 rounded-lg transition text-sm font-medium">삭제</button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-              <div className="p-4 text-center border-t border-slate-100 bg-slate-50/30 rounded-b-3xl">
-                {visibleCount < history.length ? (
-                  <button 
-                    onClick={() => setVisibleCount(prev => prev + 5)} 
+              {visibleCount < history.length ? (
+                <div className="text-center pt-4">
+                  <button onClick={() => setVisibleCount(prev => prev + 5)} 
                     className="text-sm text-orange-600 hover:text-orange-800 font-bold py-2 px-6 hover:bg-orange-50 rounded-xl transition"
                   >
                       ({(history.length - visibleCount) > 5 ? 5 : (history.length - visibleCount)}개 더보기)
                   </button>
-                ) : (
+                </div>
+              ) : history.length > 0 ? (
+                <div className="text-center pt-4">
                   <span className="text-sm text-slate-400 font-medium">
                     마지막 기록입니다. (총 {history.length}개)
                   </span>
-                )}
-              </div></>
+                </div>
+              ) : null}</>
             )}
           </div>
         ) : (
@@ -478,6 +645,28 @@ export default function ExercisePage() {
                   value={formData.content}
                   onChange={(e) => setFormData({...formData, content: e.target.value})}
                 />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-slate-600 flex items-center gap-1"><Camera size={14} /> 사진 업로드</label>
+                <div className="flex items-center gap-4 flex-wrap">
+                  <label className="flex items-center gap-2 px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl cursor-pointer hover:bg-slate-100 transition border-dashed">
+                    <ImagePlus size={20} className="text-slate-500" />
+                    <span className="text-sm text-slate-600 font-medium">사진 선택</span>
+                    <input type="file" accept="image/*" multiple className="hidden" onChange={handleImageChange} />
+                  </label>
+                  {formData.images.length > 0 && (
+                    <div className="flex gap-2 flex-wrap">
+                      {formData.images.map((img, idx) => (
+                        <div key={idx} className="relative group">
+                          <img src={img} alt="preview" className="w-16 h-16 object-cover rounded-xl border-2 border-orange-500 shadow-sm" />
+                          <button type="button" onClick={() => setFormData(prev => ({ ...prev, images: prev.images.filter((_, i) => i !== idx) }))}
+                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-md group-hover:scale-110 transition"><X size={12} /></button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
 
               <button
@@ -563,6 +752,19 @@ export default function ExercisePage() {
                   className="w-full py-3 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-600 transition"
                 >
                   수정하기
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        {/* 라이트박스 */}
+        {lightboxImage && (
+          <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onClick={() => setLightboxImage(null)}>
+            <div className="relative max-w-2xl w-full max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+              <Image src={lightboxImage} alt="preview" width={800} height={600} className="w-full h-auto max-h-[80vh] object-contain rounded-2xl" />
+              <div className="absolute top-4 right-4 flex gap-2">
+                <button onClick={() => setLightboxImage(null)} className="bg-white/20 backdrop-blur-sm text-white rounded-full p-2 hover:bg-white/40 transition" title="닫기">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                 </button>
               </div>
             </div>

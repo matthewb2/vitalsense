@@ -19,6 +19,43 @@ const getImageUrl = (imagePath: string | null | undefined): string | null => {
   return `${IMAGE_HOST_URL}/${imagePath}`;
 };
 
+// 상대 시간을 계산해 주는 헬퍼 함수
+const formatRelativeTime = (dateString: string): string => {
+  if (!dateString) return '';
+  
+  const now = new Date();
+  const past = new Date(dateString);
+  
+  // 날짜 변환이 올바르지 않은 경우 원본 문자열 반환
+  if (isNaN(past.getTime())) return dateString;
+
+  const diffInMilliSeconds = now.getTime() - past.getTime();
+  const diffInSeconds = Math.floor(diffInMilliSeconds / 1000);
+  const diffInMinutes = Math.floor(diffInSeconds / 60);
+  const diffInHours = Math.floor(diffInMinutes / 60);
+  const diffInDays = Math.floor(diffInHours / 24);
+  const diffInWeeks = Math.floor(diffInDays / 7);
+  const diffInMonths = Math.floor(diffInDays / 30);
+  const diffInYears = Math.floor(diffInDays / 365);
+
+  if (diffInSeconds < 60) {
+    return '방금 전';
+  } else if (diffInMinutes < 60) {
+    return `${diffInMinutes}분 전`;
+  } else if (diffInHours < 24) {
+    return `${diffInHours}시간 전`;
+  } else if (diffInDays < 7) {
+    return `${diffInDays}일 전`;
+  } else if (diffInWeeks < 4) {
+    return `${diffInWeeks}주일 전`;
+  } else if (diffInMonths < 12) {
+    return `${diffInMonths}달 전`;
+  } else {
+    return `${diffInYears}년 전`;
+  }
+};
+
+
 type MealType = 'breakfast' | 'lunch' | 'dinner' | 'other';
 
 interface FoodRecord {
@@ -179,7 +216,7 @@ export default function DietPage() {
   };
 
 const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []).reverse();
+    const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
     try {
       const compressed = await Promise.all(files.map(f => compressImage(f)));
@@ -517,7 +554,7 @@ const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
                   <div key={item._id} className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4">
                     {/* 상단: 날짜 및 식사 유형 */}
                     <div className="flex justify-between items-center mb-3">
-                      <span className="text-sm font-medium text-slate-500">{item.date}</span>
+                      <span className="text-sm font-medium text-slate-500">{formatRelativeTime(item.date)}</span>
                       <span className={`px-2 py-1 rounded-full text-xs font-bold ${mealColors[item.mealType]}`}>
                         {mealLabels[item.mealType]}{item.calories ? ` · ${item.calories}kcal` : ''}
                       </span>
@@ -636,7 +673,7 @@ const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
                   <label className="flex items-center gap-2 px-5 py-3 bg-slate-50 border border-slate-200 rounded-2xl cursor-pointer hover:bg-slate-100 transition border-dashed">
                     <ImagePlus size={20} className="text-slate-500" />
                     <span className="text-sm text-slate-600 font-medium">사진 선택</span>
-                    <input type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
+                    <input type="file" accept="image/*" multiple className="hidden" onChange={handleImageChange} />
                   </label>
 
                   {/* 사진 미리보기 */}
