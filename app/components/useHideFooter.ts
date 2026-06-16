@@ -4,5 +4,5 @@ import { usePathname } from 'next/navigation';
 
 export function useHideFooter() {
   const pathname = usePathname();
-  return pathname === '/chat';
+  return pathname === '/chat' || pathname === '/';
 }

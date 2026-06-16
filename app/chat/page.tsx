@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Send, History, Trash2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { useAuthStore } from '@/store/authStore';
-import Header from '@/app/components/Header';
+import Header from '@/app/components/ChatHeader';
 import { useSwipeNavigate } from '@/app/components/useSwipeNavigate';
 
 const initialMessages = [
@@ -24,10 +24,6 @@ function ChatContent() {
   const [showHistory, setShowHistory] = useState(false);
   const [chatHistory, setChatHistory] = useState<any[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  // 1. 컴포넌트 상단에 ref와 상태(Height) 추가
-const containerRef = useRef<HTMLDivElement>(null);
-const [viewportHeight, setViewportHeight] = useState('100dvh');
-  
 
   useSwipeNavigate(undefined, '/blood-pressure');
 
@@ -80,10 +76,7 @@ useEffect(() => {
 
   const handleResize = () => {
     if (window.visualViewport) {
-      // 키보드가 올라오면 visualViewport.height가 작아집니다.
-      setViewportHeight(`${window.visualViewport.height}px`);
-      
-      // 키보드가 올라왔을 때 입력창이 가려지지 않도록 스크롤을 맨 아래로 강제 이동
+      // 키보드가 올라오면 입력창이 가려지지 않도록 스크롤을 맨 아래로 강제 이동
       setTimeout(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
       }, 100);
@@ -179,13 +172,12 @@ useEffect(() => {
   };
 
   return (
-    <div 
-    ref={containerRef}
-    style={{ height: viewportHeight }}
-    className="w-full bg-white flex flex-col overflow-hidden fixed inset-0">
-    <Header title="바이탈센스" />
-      
-      {/* 히스토리 패널 */}
+    <div className="h-dvh w-full bg-white flex flex-col overflow-hidden">
+      {/* 스크롤 영역 (헤더 + 메시지) */}
+      <div className="flex-1 overflow-y-auto min-h-0">
+        <Header />
+
+        {/* 히스토리 패널 */}
       {showHistory && (
         <div className="fixed inset-0 bg-white z-50 overflow-y-auto">
           <div className="p-4">
@@ -221,8 +213,8 @@ useEffect(() => {
         </div>
       )}
 
-      {/* 채팅 영역 - 전체 화면 */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 min-h-0">
+      {/* 채팅 영역 */}
+      <div className="px-4 py-4 space-y-4 min-h-0">
         {messages.map((msg, i) => (
           <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div
@@ -280,6 +272,7 @@ useEffect(() => {
           </div>
         )}
         <div ref={messagesEndRef} />
+      </div>
       </div>
 
       {/* 하단 입력창 */}

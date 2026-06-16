@@ -19,6 +19,15 @@ const getImageUrl = (imagePath: string | null | undefined): string | null => {
   return `${IMAGE_HOST_URL}/${imagePath}`;
 };
 
+// 한국 시간 (UTC+9) 기준 오늘 날짜 문자열 반환
+const getKoreanDateString = () => {
+  const kst = new Date(Date.now() + 9 * 60 * 60 * 1000);
+  const year = kst.getUTCFullYear();
+  const month = String(kst.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(kst.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 // 상대 시간을 계산해 주는 헬퍼 함수
 const formatRelativeTime = (dateString: string): string => {
   if (!dateString) return '';
@@ -104,7 +113,7 @@ export default function ExercisePage() {
   const [fetching, setFetching] = useState(false);
   const [visibleCount, setVisibleCount] = useState(5);
   const [formData, setFormData] = useState({
-    date: new Date().toISOString().split('T')[0],
+    date: getKoreanDateString(),
     exerciseType: 'running' as ExerciseType,
     duration: '',
     calories: '',
@@ -322,7 +331,7 @@ export default function ExercisePage() {
       setSaved(true);
       fetchHistory(currentToken);
       setFormData({
-        date: new Date().toISOString().split('T')[0],
+        date: getKoreanDateString(),
         exerciseType: 'running',
         duration: '',
         calories: '',

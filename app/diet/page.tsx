@@ -19,18 +19,57 @@ const getImageUrl = (imagePath: string | null | undefined): string | null => {
   return `${IMAGE_HOST_URL}/${imagePath}`;
 };
 
-// 상대 시간을 계산해 주는 헬퍼 함수
+// 한국 시간 (UTC+9) 기준 오늘 날짜 문자열 반환
+const getKoreanDateString = () => {
+  // 현재 시간에 한국 타임존 오프셋(+9시간)을 더해 KST 기준 날짜 계산
+  const now = new Date();
+  const kst = new Date(now.getTime() + (9 * 60 * 60 * 1000));
+  const year = kst.getUTCFullYear();
+  const month = String(kst.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(kst.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const parseDate = (dateString: string): Date | null => {
+  if (!dateString) return null;
+  let past: Date;
+  if (dateString.endsWith('Z') || /[+-]\d{2}:?\d{2}$/.test(dateString)) {
+    past = new Date(dateString);
+  } else if (dateString.includes('T') || dateString.includes(' ')) {
+    const formatted = dateString.replace(' ', 'T');
+    past = new Date(`${formatted}Z`);
+  } else {
+    past = new Date(`${dateString}T00:00:00Z`);
+  }
+  if (isNaN(past.getTime())) return null;
+  // GMT -> KST (+9)
+  past = new Date(past.getTime() + 9 * 60 * 60 * 1000);
+  return past;
+};
+
 const formatRelativeTime = (dateString: string): string => {
   if (!dateString) return '';
   
-  const now = new Date();
-  const past = new Date(dateString);
+  // 1. '2026.06.16 14:35:48' -> '2026-06-16T14:35:48Z' 형태로 변환 (UTC 명시)
+  const normalizedString = dateString
+    .trim()
+    .replace(/\./g, '-')       // 점(.)을 하이픈(-)으로 변경
+    .replace(' ', 'T');        // 공백을 T로 변경
   
-  // 날짜 변환이 올바르지 않은 경우 원본 문자열 반환
-  if (isNaN(past.getTime())) return dateString;
+  // 표준 ISO 포맷 끝에 Z가 없다면 확실하게 붙여서 UTC 표준시임을 명시
+  const utcString = normalizedString.endsWith('Z') ? normalizedString : `${normalizedString}Z`;
+  
+  const past = new Date(utcString);
+  if (isNaN(past.getTime())) return dateString; // 파싱 실패 시 원본 반환
 
+  // 2. 상대 시간 계산 (물리적 타임스탬프 차이 비교)
+  const now = new Date();
   const diffInMilliSeconds = now.getTime() - past.getTime();
   const diffInSeconds = Math.floor(diffInMilliSeconds / 1000);
+  
+  // 서버/클라이언트 미세한 시차로 인한 음수 발생 방지
+  if (diffInSeconds < 0) return `방금 전 (${dateString})`; 
+
   const diffInMinutes = Math.floor(diffInSeconds / 60);
   const diffInHours = Math.floor(diffInMinutes / 60);
   const diffInDays = Math.floor(diffInHours / 24);
@@ -38,29 +77,34 @@ const formatRelativeTime = (dateString: string): string => {
   const diffInMonths = Math.floor(diffInDays / 30);
   const diffInYears = Math.floor(diffInDays / 365);
 
-  if (diffInSeconds < 60) {
-    return '방금 전';
-  } else if (diffInMinutes < 60) {
-    return `${diffInMinutes}분 전`;
-  } else if (diffInHours < 24) {
-    return `${diffInHours}시간 전`;
-  } else if (diffInDays < 7) {
-    return `${diffInDays}일 전`;
-  } else if (diffInWeeks < 4) {
-    return `${diffInWeeks}주일 전`;
-  } else if (diffInMonths < 12) {
-    return `${diffInMonths}달 전`;
-  } else {
-    return `${diffInYears}년 전`;
-  }
-};
+  let relative: string;
+  if (diffInSeconds < 60) relative = '방금 전';
+  else if (diffInMinutes < 60) relative = `${diffInMinutes}분 전`;
+  else if (diffInHours < 24) relative = `${diffInHours}시간 전`;
+  else if (diffInDays < 7) relative = `${diffInDays}일 전`;
+  else if (diffInWeeks < 4) relative = `${diffInWeeks}주일 전`;
+  else if (diffInMonths < 12) relative = `${diffInMonths}달 전`;
+  else relative = `${diffInYears}년 전`;
 
+  // 3. absolute 계산 (KST 반영)
+  // 기기 타임존이 한국(KST)이므로, UTC로 생성된 past 객체에서 
+  // 일반 Get 메서드를 호출하면 자동으로 +9시간이 적용된 값을 반환합니다.
+  const y = past.getFullYear();
+  const m = String(past.getMonth() + 1).padStart(2, '0');
+  const d = String(past.getDate()).padStart(2, '0');
+  const h = String(past.getHours()).padStart(2, '0');
+  const min = String(past.getMinutes()).padStart(2, '0');
+  const absolute = `${y}.${m}.${d}`;
+
+  return `${relative} (${absolute})`;
+};
 
 type MealType = 'breakfast' | 'lunch' | 'dinner' | 'other';
 
 interface FoodRecord {
   _id: number;
   date: string;
+  createdAt?: string;
   mealType: MealType;
   content: string;
   calories?: string;
@@ -90,7 +134,7 @@ export default function DietPage() {
   const [history, setHistory] = useState<FoodRecord[]>([]);
   const [visibleCount, setVisibleCount] = useState(5);
   const [formData, setFormData] = useState({
-    date: new Date().toISOString().split('T')[0],
+    date: getKoreanDateString(),
     mealType: 'breakfast' as MealType,
     content: '',
     calories: '',
@@ -291,6 +335,7 @@ const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
           return {
             _id: item._id,
             date: item.content.split('측정 일시: ')[1]?.split('\n')[0] || '',
+            createdAt: item.createdAt,
             mealType: mealType,
             content: item.content,
             calories: extra.calories?.toString() || (contentCalories ? contentCalories[1] : ''),
@@ -377,7 +422,7 @@ const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         setSaved(true);
         fetchHistory(currentToken);
         setFormData({
-          date: new Date().toISOString().split('T')[0],
+          date: getKoreanDateString(),
           mealType: 'breakfast',
           content: '',
           calories: '',
@@ -554,7 +599,7 @@ const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
                   <div key={item._id} className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4">
                     {/* 상단: 날짜 및 식사 유형 */}
                     <div className="flex justify-between items-center mb-3">
-                      <span className="text-sm font-medium text-slate-500">{formatRelativeTime(item.date)}</span>
+                      <span className="text-sm font-medium text-slate-500">{formatRelativeTime(item.createdAt)}</span>
                       <span className={`px-2 py-1 rounded-full text-xs font-bold ${mealColors[item.mealType]}`}>
                         {mealLabels[item.mealType]}{item.calories ? ` · ${item.calories}kcal` : ''}
                       </span>
@@ -640,7 +685,7 @@ const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
             )}
           </div>
         ) : (
-          <div className="bg-white rounded-3xl shadow-xl border border-slate-100 overflow-hidden">
+          <div id="data-no-page-swipe" className="bg-white rounded-3xl shadow-xl border border-slate-100 overflow-hidden">
             <div className="bg-gradient-to-r from-green-500 to-emerald-500 p-6 text-white text-center">
               <h2 className="text-xl font-bold flex items-center justify-center gap-2"><Utensils size={24} /> 식사 기록</h2>
             </div>

@@ -250,7 +250,7 @@ export default function BmiPage() {
     <div className="min-h-screen bg-slate-50 text-slate-900 ">
       <Header />
       
-      <main className="max-w-2xl mx-auto mt-6 ml-4 mr-4">
+      <main className="max-w-2xl mx-auto mt-6 px-4">
         
         <div className="bg-white rounded-3xl shadow-xl border border-slate-100 overflow-hidden">
           <div className="bg-gradient-to-r from-purple-500 to-indigo-500 p-6 text-white text-center">

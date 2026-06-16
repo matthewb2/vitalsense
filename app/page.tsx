@@ -5,7 +5,10 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Activity, Heart, Droplets, Utensils, Search } from 'lucide-react';
 import Header from '@/app/components/Header';
+import RecommendationSection from '@/components/RecommendationSection';
+import ChatWidget from '@/components/ChatWidget';
 import { useAuthStore } from '@/store/authStore';
+
 
 export default function HealthDashboard() {
   const router = useRouter();
@@ -164,154 +167,132 @@ export default function HealthDashboard() {
     <div className="min-h-screen bg-slate-50 text-slate-900 ">
       <Header />
 
-      <main className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-4 p-4">
-        
-        {/* 왼쪽: 생체 지표 카드 섹션 */}
-        <div className="lg:col-span-2 space-y-6">
-          <div className="grid grid-cols-3 gap-2 sm:gap-4">
-            <HealthCard 
-              title="혈압" 
-              value={healthData.bp.value || '기록없음'} 
-              unit="" 
-              icon={<Heart className="text-red-500 w-4 h-4 sm:w-5 sm:h-5" />} 
-              status={healthData.bp.status || ''} 
-              href="/blood-pressure"
-              loading={loading}
-            />
-            <HealthCard 
-              title="혈당" 
-              value={healthData.sugar.value || '기록없음'} 
-              unit="" 
-              icon={<Droplets className="text-blue-500 w-4 h-4 sm:w-5 sm:h-5" />} 
-              status={healthData.sugar.status || ''} 
-              color="text-orange-500"
-              href="/blood-sugar"
-              loading={loading}
-            />
-            <HealthCard 
-              title="BMI" 
-              value={healthData.bmi.value || '기록없음'} 
-              unit="" 
-              icon={<Activity className="text-purple-500 w-4 h-4 sm:w-5 sm:h-5" />} 
-              status={healthData.bmi.status || ''}
-              href="/bmi"
-              loading={loading}
-            />
-          </div>
+      <main className="max-w-6xl mx-auto p-4 space-y-6">
+        {/* 생체 지표 카드 섹션 */}
+        <div className="grid grid-cols-3 gap-2 sm:gap-4">
+          <HealthCard 
+            title="혈압" 
+            value={healthData.bp.value || '기록없음'} 
+            unit="mmHg" 
+            icon={<Heart className="text-red-500 w-4 h-4 sm:w-5 sm:h-5" />} 
+            status={healthData.bp.status || ''} 
+            href="/blood-pressure"
+            loading={loading}
+          />
+          <HealthCard 
+            title="혈당" 
+            value={healthData.sugar.value || '기록없음'} 
+            unit="mg/ml" 
+            icon={<Droplets className="text-blue-500 w-4 h-4 sm:w-5 sm:h-5" />} 
+            status={healthData.sugar.status || ''} 
+            color="text-orange-500"
+            href="/blood-sugar"
+            loading={loading}
+          />
+          <HealthCard 
+            title="BMI" 
+            value={healthData.bmi.value || '기록없음'} 
+            unit="index" 
+            icon={<Activity className="text-purple-500 w-4 h-4 sm:w-5 sm:h-5" />} 
+            status={healthData.bmi.status || ''}
+            href="/bmi"
+            loading={loading}
+          />
+        </div>
 
-          {/* 식단 및 운동 요약 */}
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-            <h3 className="font-semibold mb-4 flex items-center gap-2">
-              <Utensils size={20} /> 오늘 하루 기록
-            </h3>
-            <div className="space-y-4">
-              {todayDiet.length === 0 ? (
-                <Link href="/diet" className="block">
-                  <div className="flex justify-between items-center p-3 bg-slate-50 rounded-lg cursor-pointer hover:bg-slate-100 transition">
-                    <span className="text-slate-400">식단: 기록없음</span>
-                    <span className="text-sm text-blue-500">기록하기</span>
-                  </div>
-                </Link>
-              ) : (
-                <Link href="/diet" className="block">
-                  <div className="space-y-2">
-                    {todayDiet.map((item, i) => {
-                      // 변경 코드: mealType에 엄격한 유니온 타입을 명시하고 기본값 'other'를 보장합니다.
-                      let mealType: 'breakfast' | 'lunch' | 'dinner' | 'other' = item.extra?.mealType || 'other';
-                      
-                      if ((mealType === 'other') && item.title) {
-                        if (item.title.startsWith('아침')) mealType = 'breakfast';
-                        else if (item.title.startsWith('점심')) mealType = 'lunch';
-                        else if (item.title.startsWith('저녁')) mealType = 'dinner';
-                      }
-                      const mealLabel = { breakfast: '아침', lunch: '점심', dinner: '저녁', other: '기타' }[mealType];
-                      const content = item.content.split('\n')[1]?.split(': ')[1] || '';
-                      return (
-                        <div key={i} className="flex justify-between items-center p-3 bg-slate-50 rounded-lg cursor-pointer hover:bg-slate-100 transition">
-                          <span>{mealLabel}: {content}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </Link>
-              )}
+        {/* 식단 및 운동 요약 */}
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+          <h3 className="font-semibold mb-4 flex items-center gap-2">
+            <Utensils size={20} /> 오늘 하루 기록
+          </h3>
+          <div className="space-y-4">
+            {todayDiet.length === 0 ? (
+              <Link href="/diet" className="block">
+                <div className="flex justify-between items-center p-3 bg-slate-50 rounded-lg cursor-pointer hover:bg-slate-100 transition">
+                  <span className="text-slate-400">식단: 기록없음</span>
+                  <span className="text-sm text-blue-500">기록하기</span>
+                </div>
+              </Link>
+            ) : (
+              <Link href="/diet" className="block">
+                <div className="space-y-2">
+                  {todayDiet.map((item, i) => {
+                    let mealType: 'breakfast' | 'lunch' | 'dinner' | 'other' = item.extra?.mealType || 'other';
+                    
+                    if ((mealType === 'other') && item.title) {
+                      if (item.title.startsWith('아침')) mealType = 'breakfast';
+                      else if (item.title.startsWith('점심')) mealType = 'lunch';
+                      else if (item.title.startsWith('저녁')) mealType = 'dinner';
+                    }
+                    const mealLabel = { breakfast: '아침', lunch: '점심', dinner: '저녁', other: '기타' }[mealType];
+                    const content = item.content.split('\n')[1]?.split(': ')[1] || '';
+                    return (
+                      <div key={i} className="flex justify-between items-center p-3 bg-slate-50 rounded-lg cursor-pointer hover:bg-slate-100 transition">
+                        <span>{mealLabel}: {content}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </Link>
+            )}
 
-              {todayExercise.length === 0 ? (
-                <Link href="/exercise" className="block">
-                  <div className="flex justify-between items-center p-3 bg-slate-50 rounded-lg cursor-pointer hover:bg-slate-100 transition">
-                    <span className="text-slate-400">운동: 기록없음</span>
-                    <span className="text-sm text-orange-500">기록하기</span>
-                  </div>
-                </Link>
-              ) : (
-                <Link href="/exercise" className="block">
-                  <div className="space-y-2">
-                  {todayExercise.map((item, i) => {
-  let exerciseType = item.extra?.exerciseType;
-  let duration = item.extra?.duration;
-  let calories = item.extra?.calories ? ` -${item.extra.calories}kcal` : '';
-  
-  if (!exerciseType && item.title) {
-    if (item.title.startsWith('러닝')) exerciseType = 'running';
-    else if (item.title.startsWith('걷기')) exerciseType = 'walking';
-    else if (item.title.startsWith('수영')) exerciseType = 'swimming';
-    else if (item.title.startsWith('자전거')) exerciseType = 'cycling';
-    else if (item.title.startsWith('헬스')) exerciseType = 'weight';
-    else if (item.title.startsWith('요가')) exerciseType = 'yoga';
-  }
-  
-  if (!duration && item.title) {
-    const durationMatch = item.title.match(/(\d+)분/);
-    if (durationMatch) duration = durationMatch[1];
-  }
-  
-  // 묶어서 처리함으로써 implicit 'any' 에러를 완벽히 우회합니다.
-  const exerciseLabels = { 
-    running: '러닝', 
-    walking: '걷기', 
-    swimming: '수영', 
-    cycling: '자전거', 
-    weight: '헬스', 
-    yoga: '요가', 
-    other: '기타' 
-  };
-  const exerciseLabel = exerciseLabels[exerciseType as keyof typeof exerciseLabels] || '기타';
+            {todayExercise.length === 0 ? (
+              <Link href="/exercise" className="block">
+                <div className="flex justify-between items-center p-3 bg-slate-50 rounded-lg cursor-pointer hover:bg-slate-100 transition">
+                  <span className="text-slate-400">운동: 기록없음</span>
+                  <span className="text-sm text-orange-500">기록하기</span>
+                </div>
+              </Link>
+            ) : (
+              <Link href="/exercise" className="block">
+                <div className="space-y-2">
+                {todayExercise.map((item, i) => {
+let exerciseType = item.extra?.exerciseType;
+let duration = item.extra?.duration;
+let calories = item.extra?.calories ? ` -${item.extra.calories}kcal` : '';
 
-  return (
-    <div key={i} className="flex justify-between items-center p-3 bg-slate-50 rounded-lg cursor-pointer hover:bg-slate-100 transition">
-      <span>운동: {exerciseLabel} {duration ? `${duration}분` : ''}{calories}</span>
-    </div>
-  );
+if (!exerciseType && item.title) {
+  if (item.title.startsWith('러닝')) exerciseType = 'running';
+  else if (item.title.startsWith('걷기')) exerciseType = 'walking';
+  else if (item.title.startsWith('수영')) exerciseType = 'swimming';
+  else if (item.title.startsWith('자전거')) exerciseType = 'cycling';
+  else if (item.title.startsWith('헬스')) exerciseType = 'weight';
+  else if (item.title.startsWith('요가')) exerciseType = 'yoga';
+}
+
+if (!duration && item.title) {
+  const durationMatch = item.title.match(/(\d+)분/);
+  if (durationMatch) duration = durationMatch[1];
+}
+
+const exerciseLabels = { 
+  running: '러닝', 
+  walking: '걷기', 
+  swimming: '수영', 
+  cycling: '자전거', 
+  weight: '헬스', 
+  yoga: '요가', 
+  other: '기타' 
+};
+const exerciseLabel = exerciseLabels[exerciseType as keyof typeof exerciseLabels] || '기타';
+
+return (
+  <div key={i} className="flex justify-between items-center p-3 bg-slate-50 rounded-lg cursor-pointer hover:bg-slate-100 transition">
+    <span>운동: {exerciseLabel} {duration ? `${duration}분` : ''}{calories}</span>
+  </div>
+);
 })}
-                  </div>
-                </Link>
-              )}
-            </div>
+                </div>
+              </Link>
+            )}
           </div>
         </div>
 
-        {/* 오른쪽: Google 검색 스타일 AI 채팅 */}
-        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-4">
-          <Link href="/chat" className="block">
-            <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-full hover:shadow-md transition cursor-pointer">
-              <Search size={20} className="text-slate-400" />
-              <span className="text-slate-400">AI에게 물어보세요...</span>
-            </div>
-          </Link>
-          
-          {/* 최근 질문 (선택적) */}
-          <div className="mt-4 pt-4 border-t">
-            <p className="text-xs text-slate-400 mb-2">추천 질문</p>
-            <div className="space-y-2">
-              <div className="text-sm text-slate-600 p-2 hover:bg-slate-50 rounded-lg cursor-pointer">
-                혈압이 140/90이면 정상인가요?
-              </div>
-              <div className="text-sm text-slate-600 p-2 hover:bg-slate-50 rounded-lg cursor-pointer">
-                공복혈당 126mg/dL는 높은 것인가요?
-              </div>
-            </div>
-          </div>
-        </div>
+        {/* AI 채팅 위젯 */}
+        <ChatWidget />
+
+        {/* 추천 콘텐츠 */}
+        <RecommendationSection />
       </main>
     </div>
   );
@@ -340,9 +321,9 @@ function HealthCard({ title, value, unit, icon, status, color = "text-green-500"
         <div className="p-1.5 sm:p-2 bg-slate-50 rounded-lg">{icon}</div>
         <span className="text-xs sm:text-sm text-slate-500 font-medium">{title}</span>
       </div>
-      <div className="flex items-baseline gap-1">
+      <div className="flex items-baseline gap-1 justify-center">
         <span className="text-lg sm:text-xl">{value}</span>
-        {unit && <span className="text-xs text-slate-400">{unit}</span>}
+        {unit && <span className="text-[0.7rem] text-slate-400"> {unit}</span>}
       </div>
     </div>
   );
