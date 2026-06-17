@@ -3,21 +3,22 @@
 import React, { useState, useRef, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Send, History, Trash2 } from 'lucide-react';
+import { Send, Trash2, Plus } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { useAuthStore } from '@/store/authStore';
 import Header from '@/app/components/ChatHeader';
 import { useSwipeNavigate } from '@/app/components/useSwipeNavigate';
-
-const initialMessages = [
-  { role: 'ai', content: '안녕하세요! 저는 바이탈센스 에이전트입니다. 건강에 관한 무엇이든 물어보세요. 혈당, 혈압, 식단, 운동 등 다양한 건강 정보를 알려드릴 수 있습니다.' }
-];
+import { useChatStore, Message } from '@/store/chatStore';
 
 function ChatContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, isLoggedIn, checkAuth } = useAuthStore();
-  const [messages, setMessages] = useState(initialMessages);
+  
+// ... ChatContent 내부
+const { messages, setMessages } = useChatStore();
+
+
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -143,7 +144,7 @@ useEffect(() => {
     const userMessage = input.trim();
     setInput('');
     
-    const newMessages = [...messages, { role: 'user', content: userMessage }];
+    const newMessages: Message[] = [...messages, { role: 'user', content: userMessage }];
     setMessages(newMessages);
     setLoading(true);
 
@@ -196,42 +197,45 @@ useEffect(() => {
     <div className="h-dvh w-full bg-white flex flex-col overflow-hidden">
       {/* 스크롤 영역 (헤더 + 메시지) */}
       <div className="flex-1 overflow-y-auto min-h-0">
-        <Header />
+        <Header onMenuClick={() => { fetchChatHistory(); setShowHistory(true); }} />
 
-        {/* 히스토리 패널 */}
+        {/* 히스토리 사이드바 */}
       {showHistory && (
-        <div className="fixed inset-0 bg-white z-50 overflow-y-auto">
-          <div className="p-4">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-bold">이전 질문 목록</h2>
-              <button onClick={() => setShowHistory(false)} className="p-2 hover:bg-slate-100 rounded-full">
-                ✕
+        <>
+          <div className="fixed inset-0 bg-black/40 z-40" onClick={() => setShowHistory(false)} />
+          <div className="fixed left-0 top-0 bottom-0 w-80 bg-white z-50 shadow-2xl flex flex-col animate-slide-in">
+            <div className="flex items-center justify-between p-4 border-b border-slate-100">
+              <h2 className="text-base font-bold text-slate-800">이전 질문</h2>
+              <button onClick={() => setShowHistory(false)} className="p-1.5 hover:bg-slate-100 rounded-lg transition text-slate-400 hover:text-slate-600">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
             </div>
-            {chatHistory.length === 0 ? (
-              <p className="text-slate-500 text-center py-8">이전 질문이 없습니다.</p>
-            ) : (
-              <div className="space-y-2">
-                {chatHistory.map((item, i) => (
+            <div className="flex-1 overflow-y-auto p-3 space-y-1">
+              {chatHistory.length === 0 ? (
+                <p className="text-slate-400 text-center py-8 text-sm">이전 질문이 없습니다.</p>
+              ) : (
+                chatHistory.map((item, i) => (
                   <div 
                     key={item._id || i} 
                     onClick={() => handleHistoryClick(item.content)}
-                    className="p-3 bg-slate-50 rounded-lg hover:bg-slate-100 cursor-pointer relative"
+                    className="p-3 rounded-xl hover:bg-slate-100 cursor-pointer transition group"
                   >
-                    <p className="text-sm text-slate-700 line-clamp-2 pr-8">{item.content}</p>
-                    <p className="text-xs text-slate-400 mt-1">{item.createdAt?.split('T')[0] || ''}</p>
-                    <button 
-                      onClick={(e) => handleDeleteHistory(e, item._id)}
-                      className="absolute top-3 right-3 p-1 text-slate-400 hover:text-red-500"
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                    <p className="text-sm text-slate-700 line-clamp-2">{item.content}</p>
+                    <div className="flex items-center justify-between mt-1.5">
+                      <p className="text-xs text-slate-400">{item.createdAt?.split('T')[0] || ''}</p>
+                      <button 
+                        onClick={(e) => handleDeleteHistory(e, item._id)}
+                        className="p-1 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
                   </div>
-                ))}
-              </div>
-            )}
+                ))
+              )}
+            </div>
           </div>
-        </div>
+        </>
       )}
 
       {/* 채팅 영역 */}
@@ -297,8 +301,8 @@ useEffect(() => {
       </div>
 
       {/* 하단 입력창 */}
-      <div className="flex-shrink-0 bg-white">
-        <div className="max-w-3xl mx-auto px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
+      <div className="flex-shrink-0 bg-white border-t border-slate-100">
+        <div className="max-w-3xl mx-auto px-4 py-3">
           <div className="relative flex items-end gap-0 bg-white border border-slate-200 rounded-2xl shadow-sm focus-within:border-slate-300 focus-within:shadow-md transition-all">
             <textarea
               value={input}
@@ -315,13 +319,6 @@ useEffect(() => {
               rows={Math.max(1, Math.min(input.split('\n').length, 8))}
             />
             <div className="flex items-center gap-0.5 pr-2 pb-2 shrink-0">
-              <button
-                onClick={() => { fetchChatHistory(); setShowHistory(true); }}
-                className="p-2 text-slate-400 hover:text-slate-600 rounded-xl transition"
-                title="이전 질문 보기"
-              >
-                <History size={20} />
-              </button>
               <button
                 onClick={handleSendMessage}
                 disabled={loading || !input.trim()}

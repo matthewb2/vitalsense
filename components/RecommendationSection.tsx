@@ -130,16 +130,16 @@ export default function RecommendationSection() {
             <div className="p-4 flex gap-3">
               <div className="flex-1 min-w-0">
                 <h3
-                  className="font-bold text-slate-800 text-sm line-clamp-2 group-hover:text-emerald-600 transition-colors leading-snug"
+                  className="font-bold text-slate-800 text-lg line-clamp-2 group-hover:text-emerald-600 transition-colors leading-snug"
                   dangerouslySetInnerHTML={{ __html: doc.title }}
                 />
-                <p className="text-[10px] text-slate-400 mt-1 truncate">{doc.url}</p>
+                <p className="text-xs text-slate-400 mt-1 truncate">{doc.url}</p>
                 <p
-                  className="text-xs text-slate-600 mt-2 line-clamp-3 leading-relaxed"
+                  className="text-sm text-slate-600 mt-2 line-clamp-3 leading-relaxed"
                   dangerouslySetInnerHTML={{ __html: doc.contents }}
                 />
                 <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-400">
-                  <span className="font-medium text-slate-500 truncate">{doc.blogname || doc.cafename || '웹문서'}</span>
+                  <span className="font-sm text-slate-500 truncate">{doc.blogname || doc.cafename || '웹문서'}</span>
                   <span className="shrink-0 ml-2">{doc.datetime.substring(0, 10).replace(/-/g, '.')}</span>
                 </div>
               </div>

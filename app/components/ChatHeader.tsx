@@ -1,22 +1,35 @@
 "use client";
 
 import React from 'react';
-import { HeartPulse, User } from 'lucide-react';
+import { HeartPulse, User, Menu } from 'lucide-react';
 import Link from 'next/link';
 import { useAuthStore } from '@/store/authStore';
 
-export default function ChatHeader() {
+interface ChatHeaderProps {
+  onMenuClick?: () => void;
+}
+
+export default function ChatHeader({ onMenuClick }: ChatHeaderProps) {
   const { user, isLoggedIn } = useAuthStore();
 
   return (
-    <header className="w-full bg-white border-b border-slate-100">
-      <div className="flex items-center justify-between h-14 px-4">
-        <Link href="/" className="flex items-center gap-2">
-          <div className="bg-blue-600 p-1.5 rounded-lg">
-            <HeartPulse className="text-white w-5 h-5" />
-          </div>
-          <span className="text-lg font-bold text-slate-800">바이탈센스</span>
-        </Link>
+    <header className="sticky top-0 z-30 w-full bg-white/70 backdrop-blur-lg border-b border-slate-100">
+       <div className="flex justify-between items-center py-4 px-4 sm:px-8">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onMenuClick}
+            className="p-2 hover:bg-slate-100 rounded-xl transition"
+            title="이전 질문 목록"
+          >
+            <Menu size={20} className="text-slate-600" />
+          </button>
+          <Link href="/" className="flex items-center gap-2">
+            <div className="bg-blue-600 p-1.5 rounded-lg">
+              <HeartPulse className="text-white w-5 h-5" />
+            </div>
+            <span className="text-lg font-bold text-slate-800">바이탈센스</span>
+          </Link>
+        </div>
         {isLoggedIn ? (
           <Link href="/profile" className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-full shadow-sm border border-slate-200 hover:border-blue-300 transition">
             <div className="w-7 h-7 bg-blue-100 rounded-full flex items-center justify-center overflow-hidden">
