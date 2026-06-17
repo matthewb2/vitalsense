@@ -119,6 +119,24 @@ useEffect(() => {
     }
   };
 
+  const extractKeywords = async (text: string) => {
+    try {
+      const res = await fetch('/api/extract-keywords', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text }),
+      });
+      const data = await res.json();
+      if (data.ok && data.keywords) {
+        console.log('[키워드 추출]', data.keywords);
+        localStorage.setItem('vitalsense_latest_symptoms', JSON.stringify(data.keywords));
+        console.log('[키워드 저장] vitalsense_latest_symptoms:', JSON.stringify(data.keywords));
+      }
+    } catch (err) {
+      console.error('[키워드 추출 오류]', err);
+    }
+  };
+
   const handleSendMessage = async () => {
     if (!input.trim() || loading) return;
     
@@ -144,6 +162,9 @@ useEffect(() => {
       } else {
         setMessages([...newMessages, { role: 'ai', content: data.content }]);
       }
+
+      // Groq로 키워드 추출 요청
+      extractKeywords(userMessage);
 
       const currentToken = user?.token?.accessToken || user?.accessToken;
       if (currentToken) {

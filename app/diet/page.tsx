@@ -599,7 +599,7 @@ const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
                   <div key={item._id} className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4">
                     {/* 상단: 날짜 및 식사 유형 */}
                     <div className="flex justify-between items-center mb-3">
-                      <span className="text-sm font-medium text-slate-500">{formatRelativeTime(item.createdAt)}</span>
+                      <span className="text-sm font-medium text-slate-500">{formatRelativeTime(item.createdAt ?? '')}</span>
                       <span className={`px-2 py-1 rounded-full text-xs font-bold ${mealColors[item.mealType]}`}>
                         {mealLabels[item.mealType]}{item.calories ? ` · ${item.calories}kcal` : ''}
                       </span>
