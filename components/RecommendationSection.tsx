@@ -52,16 +52,23 @@ export default function RecommendationSection() {
   }, []);
 
   useEffect(() => {
-    // localStorage에서 LLM 응답 데이터를 읽어 검색어 결정
+    // localStorage에서 검색어 히스토리 읽기
     let searchQuery = '';
     try {
-      const stored = localStorage.getItem('vitalsense_latest_symptoms');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (parsed.symptoms?.length > 0) {
-          const primary = parsed.symptoms[0];
-          const bodyPart = parsed.body_parts?.[0] || '';
-          searchQuery = bodyPart ? `${bodyPart} ${primary} 증상` : `${primary} 증상`;
+      const history: string[] = JSON.parse(localStorage.getItem('vitalsense_search_history') || '[]');
+      // 최근 검색어가 있으면 랜덤 선택, 없으면 vitalsense_latest_symptoms 확인
+      if (history.length > 0) {
+        const idx = Math.floor(Math.random() * history.length);
+        searchQuery = history[idx];
+      } else {
+        const stored = localStorage.getItem('vitalsense_latest_symptoms');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed.symptoms?.length > 0) {
+            const primary = parsed.symptoms[0];
+            const bodyPart = parsed.body_parts?.[0] || '';
+            searchQuery = bodyPart ? `${bodyPart} ${primary} 증상` : `${primary} 증상`;
+          }
         }
       }
     } catch {}

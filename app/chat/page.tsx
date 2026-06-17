@@ -14,16 +14,15 @@ function ChatContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, isLoggedIn, checkAuth } = useAuthStore();
-  
-// ... ChatContent 내부
-const { messages, setMessages } = useChatStore();
-
+  const { messages, setMessages } = useChatStore();
 
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [chatHistory, setChatHistory] = useState<any[]>([]);
+  
+  const containerRef = useRef<HTMLDivElement>(null); // 최상위 컨테이너 Ref 추가
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useSwipeNavigate(undefined, '/blood-pressure');
@@ -39,6 +38,7 @@ const { messages, setMessages } = useChatStore();
     }
   }, [mounted, isLoggedIn, router]);
 
+  // 메시지나 로딩 상태가 바뀔 때 하단 스크롤
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, loading]);
@@ -71,27 +71,31 @@ const { messages, setMessages } = useChatStore();
     }
   }, [mounted, isLoggedIn]);
   
-  // 2. 키보드 리사이즈를 감지하는 useEffect 추가
-useEffect(() => {
-  if (typeof window === 'undefined' || !window.visualViewport) return;
+  // 모바일 가상 키보드 대응을 위한 Visual Viewport 제어
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.visualViewport) return;
 
-  const handleResize = () => {
-    if (window.visualViewport) {
-      // 키보드가 올라오면 입력창이 가려지지 않도록 스크롤을 맨 아래로 강제 이동
+    const adjustHeight = () => {
+      if (!window.visualViewport || !containerRef.current) return;
+      containerRef.current.style.height = `${window.visualViewport.height}px`;
+    };
+
+    const handleResize = () => {
+      adjustHeight();
       setTimeout(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
       }, 100);
-    }
-  };
+    };
 
-  window.visualViewport.addEventListener('resize', handleResize);
-  window.visualViewport.addEventListener('scroll', handleResize);
+    adjustHeight();
+    window.visualViewport.addEventListener('resize', handleResize);
+    window.visualViewport.addEventListener('scroll', handleResize);
 
-  return () => {
-    window.visualViewport?.removeEventListener('resize', handleResize);
-    window.visualViewport?.removeEventListener('scroll', handleResize);
-  };
-}, []);
+    return () => {
+      window.visualViewport?.removeEventListener('resize', handleResize);
+      window.visualViewport?.removeEventListener('scroll', handleResize);
+    };
+  }, []);
 
   const handleHistoryClick = (content: string) => {
     setInput(content);
@@ -131,6 +135,18 @@ useEffect(() => {
       if (data.ok && data.keywords) {
         console.log('[키워드 추출]', data.keywords);
         localStorage.setItem('vitalsense_latest_symptoms', JSON.stringify(data.keywords));
+
+        // 검색어 히스토리 관리 (최대 10개)
+        const primary = data.keywords.symptoms?.[0] || text;
+        if (primary) {
+          const history = JSON.parse(localStorage.getItem('vitalsense_search_history') || '[]');
+          if (!history.includes(primary)) {
+            history.unshift(primary);
+            if (history.length > 10) history.pop();
+            localStorage.setItem('vitalsense_search_history', JSON.stringify(history));
+          }
+        }
+
         console.log('[키워드 저장] vitalsense_latest_symptoms:', JSON.stringify(data.keywords));
       }
     } catch (err) {
@@ -164,7 +180,6 @@ useEffect(() => {
         setMessages([...newMessages, { role: 'ai', content: data.content }]);
       }
 
-      // Groq로 키워드 추출 요청
       extractKeywords(userMessage);
 
       const currentToken = user?.token?.accessToken || user?.accessToken;
@@ -194,12 +209,8 @@ useEffect(() => {
   };
 
   return (
-    <div className="h-dvh w-full bg-white flex flex-col overflow-hidden">
-      {/* 스크롤 영역 (헤더 + 메시지) */}
-      <div className="flex-1 overflow-y-auto min-h-0">
-        <Header onMenuClick={() => { fetchChatHistory(); setShowHistory(true); }} />
-
-        {/* 히스토리 사이드바 */}
+    <div ref={containerRef} className="w-full bg-white flex flex-col overflow-hidden fixed inset-0">
+      {/* 히스토리 사이드바 */}
       {showHistory && (
         <>
           <div className="fixed inset-0 bg-black/40 z-40" onClick={() => setShowHistory(false)} />
@@ -225,7 +236,7 @@ useEffect(() => {
                       <p className="text-xs text-slate-400">{item.createdAt?.split('T')[0] || ''}</p>
                       <button 
                         onClick={(e) => handleDeleteHistory(e, item._id)}
-                        className="p-1 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition"
+                        className="p-1 text-slate-300 hover:text-red-500 transition"
                       >
                         <Trash2 size={14} />
                       </button>
@@ -238,9 +249,14 @@ useEffect(() => {
         </>
       )}
 
-      {/* 채팅 영역 */}
-      <div className="px-4 py-4 space-y-4 min-h-0">
-        {messages.map((msg, i) => (
+      {/* 스크롤 영역 (헤더 + 메시지) */}
+      <div className="flex-1 overflow-y-auto min-h-0">
+        {/* 1. 상단 헤더 (sticky, 반투명) */}
+        <Header onMenuClick={() => { fetchChatHistory(); setShowHistory(true); }} />
+
+        {/* 2. 채팅 메시지 */}
+        <div className="px-4 py-4 space-y-4">
+          {messages.map((msg, i) => (
           <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div
               className={`max-w-[90%] p-4 rounded-2xl whitespace-pre-wrap ${
@@ -255,31 +271,11 @@ useEffect(() => {
                 <div className="prose max-w-none text-lg">
                   <ReactMarkdown
                     components={{
-                      p: ({ children }) => (
-                        <p className="text-lg leading-relaxed mb-4">
-                          {children}
-                        </p>
-                      ),
-                      li: ({ children }) => (
-                        <li className="text-lg leading-relaxed">
-                          {children}
-                        </li>
-                      ),
-                      h1: ({ children }) => (
-                        <h1 className="text-3lg font-bold mb-4">
-                          {children}
-                        </h1>
-                      ),
-                      h2: ({ children }) => (
-                        <h2 className="text-2lg font-bold mb-3">
-                          {children}
-                        </h2>
-                      ),
-                      h3: ({ children }) => (
-                        <h3 className="text-lg font-bold mb-2">
-                          {children}
-                        </h3>
-                      ),
+                      p: ({ children }) => <p className="text-lg leading-relaxed mb-4">{children}</p>,
+                      li: ({ children }) => <li className="text-lg leading-relaxed">{children}</li>,
+                      h1: ({ children }) => <h1 className="text-3lg font-bold mb-4">{children}</h1>,
+                      h2: ({ children }) => <h2 className="text-2lg font-bold mb-3">{children}</h2>,
+                      h3: ({ children }) => <h3 className="text-lg font-bold mb-2">{children}</h3>,
                     }}
                   >
                     {msg.content}
@@ -300,8 +296,8 @@ useEffect(() => {
       </div>
       </div>
 
-      {/* 하단 입력창 */}
-      <div className="flex-shrink-0 bg-white border-t border-slate-100">
+      {/* 3. 하단 입력창 고정 */}
+      <div className="flex-shrink-0 bg-white border-t border-slate-100 pb-safe">
         <div className="max-w-3xl mx-auto px-4 py-3">
           <div className="relative flex items-end gap-0 bg-white border border-slate-200 rounded-2xl shadow-sm focus-within:border-slate-300 focus-within:shadow-md transition-all">
             <textarea
@@ -311,6 +307,11 @@ useEffect(() => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
                   handleSendMessage();
+                }
+              }}
+              onFocus={() => {
+                if (window.visualViewport) {
+                  window.visualViewport.dispatchEvent(new Event('resize'));
                 }
               }}
               placeholder="건강에 대해 질문하세요..."

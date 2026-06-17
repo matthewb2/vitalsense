@@ -58,6 +58,20 @@ export async function POST(req: NextRequest) {
       parsed = { symptoms: [message], body_parts: [], duration: null, severity: null };
     }
 
+    // 중복 단어 제거 및 "증상" 제외
+    if (parsed.symptoms) {
+      parsed.symptoms = parsed.symptoms.map((s: string) => {
+        const words = s.split(/\s+/);
+        const seen = new Set<string>();
+        return words.filter(w => {
+          const lower = w.trim();
+          if (!lower || lower === '증상' || seen.has(lower)) return false;
+          seen.add(lower);
+          return true;
+        }).join(' ');
+      }).filter(Boolean);
+    }
+
     return NextResponse.json({ ok: true, keywords: parsed });
   } catch (error) {
     console.error('Extract keywords error:', error);
