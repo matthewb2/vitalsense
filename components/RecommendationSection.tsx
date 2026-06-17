@@ -115,7 +115,7 @@ export default function RecommendationSection() {
   return (
     <section className="pb-8">
       <div className="mb-4">
-        <span className="font-semibold text-slate-800">&apos;{keyword}&apos; 관련 추천 콘텐츠</span>
+        <span className="font-semibold text-slate-800">&apos;{keyword}&apos; 키워드 웹 검색</span>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
