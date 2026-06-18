@@ -1,15 +1,16 @@
 "use client";
 
 import React from 'react';
-import { HeartPulse, User, Menu } from 'lucide-react';
+import { HeartPulse, User, Menu, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { useAuthStore } from '@/store/authStore';
 
 interface ChatHeaderProps {
   onMenuClick?: () => void;
+  onNewChat?: () => void;
 }
 
-export default function ChatHeader({ onMenuClick }: ChatHeaderProps) {
+export default function ChatHeader({ onMenuClick, onNewChat }: ChatHeaderProps) {
   const { user, isLoggedIn } = useAuthStore();
 
   return (
@@ -22,6 +23,13 @@ export default function ChatHeader({ onMenuClick }: ChatHeaderProps) {
             title="이전 질문 목록"
           >
             <Menu size={20} className="text-slate-600" />
+          </button>
+          <button
+            onClick={onNewChat}
+            className="p-2 hover:bg-slate-100 rounded-xl transition"
+            title="새 대화"
+          >
+            <Plus size={20} className="text-slate-600" />
           </button>
           <Link href="/" className="flex items-center gap-2">
             <div className="bg-blue-600 p-1.5 rounded-lg">

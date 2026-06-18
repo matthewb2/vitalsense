@@ -22,6 +22,7 @@ function ChatContent() {
   const [mounted, setMounted] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [chatHistory, setChatHistory] = useState<any[]>([]);
+  const [currentPostId, setCurrentPostId] = useState<string | null>(null);
   // 요소 제어를 위한 Ref
   const containerRef = useRef<HTMLDivElement>(null); 
   const inputWrapperRef = useRef<HTMLDivElement>(null); 
@@ -185,20 +186,44 @@ function ChatContent() {
       const data = await response.json();
       console.log('[Chat] Response:', data);
       
+      let aiResponse = '';
       if (!response.ok || data.error) {
-        setMessages([...newMessages, { role: 'ai', content: data.error || '오류가 발생했습니다.' }]);
+        aiResponse = data.error || '오류가 발생했습니다.';
       } else {
-        setMessages([...newMessages, { role: 'ai', content: data.content }]);
+        aiResponse = data.content;
       }
 
+      setMessages([...newMessages, { role: 'ai', content: aiResponse }]);
       extractKeywords(userMessage);
 
       const currentToken = user?.token?.accessToken || user?.accessToken;
       if (currentToken) {
-        // 중복 저장 방지: 이미 history에 있는 메시지는 저장하지 않음
-        const alreadyExists = chatHistory.some(item => item.content === userMessage);
-        if (!alreadyExists) {
-          await fetch('/api/posts', {
+        const qaMessages = [...newMessages, { role: 'ai', content: aiResponse }]
+          .filter((msg) => !(msg.role === 'ai' && msg.content.startsWith('안녕하세요! 저는 바이탈센스')))
+          .map(msg => msg.role === 'user' ? `Q. ${msg.content}` : `A. ${msg.content}`)
+          .join('\n\n');
+        const updatedContent = qaMessages.slice(0, 2000);
+
+        if (currentPostId) {
+          console.log('[Chat] PATCH existing post:', currentPostId, 'content length:', updatedContent.length);
+          const patchRes = await fetch('/api/posts', {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              'client-id': 'vitalsense',
+              'Authorization': `Bearer ${currentToken}`
+            },
+            body: JSON.stringify({
+              id: currentPostId,
+              title: messages[0]?.content?.slice(0, 50) || userMessage.slice(0, 50),
+              content: updatedContent,
+            }),
+          });
+          const patchData = await patchRes.json();
+          console.log('[Chat] PATCH response:', patchData);
+        } else {
+          console.log('[Chat] POST new post, content:', updatedContent);
+          const createRes = await fetch('/api/posts', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -208,10 +233,15 @@ function ChatContent() {
             body: JSON.stringify({
               type: 'chat',
               title: userMessage.slice(0, 50),
-              content: userMessage,
+              content: updatedContent,
               extra: { userId: user?._id, userName: user?.name }
             }),
           });
+          const createData = await createRes.json();
+          console.log('[Chat] POST response:', createData);
+          if (createData.ok && createData.item?._id) {
+            setCurrentPostId(createData.item._id);
+          }
         }
         fetchChatHistory();
       }
@@ -223,20 +253,26 @@ function ChatContent() {
     }
   };
 
+  const handleNewChat = () => {
+    setMessages([]);
+    setCurrentPostId(null);
+  };
+
   return (
     <div ref={containerRef} className="w-full bg-white flex flex-col overflow-hidden fixed inset-0">
       <ChatHistorySidebar
         open={showHistory}
         items={chatHistory}
         onClose={() => setShowHistory(false)}
-        onItemClick={(content) => { setInput(content); setShowHistory(false); }}
+        onItemClick={(item) => { setInput(item.content); setCurrentPostId(item._id); setShowHistory(false); }}
         onDelete={handleDeleteHistory}
+        onNewChat={handleNewChat}
       />
 
 {/* [본문 레이아웃 고정] 키보드가 켜져도 이 박스의 크기는 절대 변하지 않습니다. */}
       <div className="flex-1 overflow-y-auto min-h-0 bg-white pb-32">
         {/* 1. 상단 헤더 (sticky, 반투명) */}
-        <Header onMenuClick={() => { fetchChatHistory(); setShowHistory(true); }} />
+        <Header onMenuClick={() => { fetchChatHistory(); setShowHistory(true); }} onNewChat={handleNewChat} />
 
         {/* 2. 채팅 메시지 */}
         <div className="px-4 py-4 space-y-4">
