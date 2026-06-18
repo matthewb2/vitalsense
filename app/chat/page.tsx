@@ -21,8 +21,9 @@ function ChatContent() {
   const [mounted, setMounted] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [chatHistory, setChatHistory] = useState<any[]>([]);
-  
-  const containerRef = useRef<HTMLDivElement>(null); // 최상위 컨테이너 Ref 추가
+  // 요소 제어를 위한 Ref
+  const containerRef = useRef<HTMLDivElement>(null); 
+  const inputWrapperRef = useRef<HTMLDivElement>(null); 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useSwipeNavigate(undefined, '/blood-pressure');
@@ -71,26 +72,40 @@ function ChatContent() {
     }
   }, [mounted, isLoggedIn]);
   
-  // 모바일 가상 키보드 대응을 위한 Visual Viewport 제어
+// 오직 하단 입력창만 가상 키보드 위로 올리는 Visual Viewport 제어
   useEffect(() => {
     if (typeof window === 'undefined' || !window.visualViewport) return;
 
-    const adjustHeight = () => {
-      if (!window.visualViewport || !containerRef.current) return;
-      containerRef.current.style.height = `${window.visualViewport.height}px`;
+    const adjustInputPosition = () => {
+      if (!window.visualViewport || !inputWrapperRef.current || !containerRef.current) return;
+      
+      const vv = window.visualViewport;
+      // 전체 화면(window.innerHeight)에서 현재 보이는 뷰포트 높이를 빼면 키보드 높이가 나옵니다.
+      const keyboardHeight = window.innerHeight - vv.height;
+      
+      if (keyboardHeight > 0) {
+        // 키보드가 올라왔을 때: 입력창만 키보드 높이만큼 위로 밀어 올립니다.
+        // vv.offsetTop을 더해 iOS 브라우저 상단바 등으로 인한 밀림 현상을 정밀 보정합니다.
+        inputWrapperRef.current.style.transform = `translateY(-${keyboardHeight - vv.offsetTop}px)`;
+      } else {
+        // 키보드가 닫혔을 때: 원래 위치(제자리)로 돌려놓습니다.
+        inputWrapperRef.current.style.transform = 'translateY(0)';
+      }
     };
 
     const handleResize = () => {
-      adjustHeight();
+      adjustInputPosition();
+      // 입력 도중 화면 아래가 가려지지 않도록 스크롤 유지
       setTimeout(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
       }, 100);
     };
 
-    adjustHeight();
+    // 초기 실행 및 이벤트 바인딩
+    adjustInputPosition();
     window.visualViewport.addEventListener('resize', handleResize);
     window.visualViewport.addEventListener('scroll', handleResize);
-
+    
     return () => {
       window.visualViewport?.removeEventListener('resize', handleResize);
       window.visualViewport?.removeEventListener('scroll', handleResize);
@@ -249,8 +264,8 @@ function ChatContent() {
         </>
       )}
 
-      {/* 스크롤 영역 (헤더 + 메시지) */}
-      <div className="flex-1 overflow-y-auto min-h-0">
+{/* [본문 레이아웃 고정] 키보드가 켜져도 이 박스의 크기는 절대 변하지 않습니다. */}
+      <div className="flex-1 overflow-y-auto min-h-0 bg-white pb-32">
         {/* 1. 상단 헤더 (sticky, 반투명) */}
         <Header onMenuClick={() => { fetchChatHistory(); setShowHistory(true); }} />
 
@@ -297,7 +312,11 @@ function ChatContent() {
       </div>
 
       {/* 3. 하단 입력창 고정 */}
-      <div className="flex-shrink-0 bg-white border-t border-slate-100 pb-safe">
+      {/* [하단 입력창 고정 레이어] 본문 위에 덮어씌워져 있으며, 오직 이 레이어만 Y축으로 움직입니다. */}
+      <div 
+        ref={inputWrapperRef} 
+        className="fixed bottom-0 inset-x-0 bg-white/80 backdrop-blur-md border-t border-slate-100 z-30 transition-transform duration-100 ease-out will-change-transform"
+      >
         <div className="max-w-3xl mx-auto px-4 py-3">
           <div className="relative flex items-end gap-0 bg-white border border-slate-200 rounded-2xl shadow-sm focus-within:border-slate-300 focus-within:shadow-md transition-all">
             <textarea
@@ -307,11 +326,6 @@ function ChatContent() {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
                   handleSendMessage();
-                }
-              }}
-              onFocus={() => {
-                if (window.visualViewport) {
-                  window.visualViewport.dispatchEvent(new Event('resize'));
                 }
               }}
               placeholder="건강에 대해 질문하세요..."
