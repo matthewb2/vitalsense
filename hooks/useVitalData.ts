@@ -28,7 +28,7 @@ export function useVitalData(type: string) {
   const userId = user?._id;
 
   return useQuery({
-    queryKey: ['vitals', type, userId],
+    queryKey: ['vitals', type],
     queryFn: async () => {
       const response = await fetch(`${API_URL}?type=${type}`, { headers: buildHeaders() });
       const data = await response.json();
@@ -42,11 +42,11 @@ export function useVitalData(type: string) {
       return filtered.sort((a: any, b: any) => new Date(b.createdAt || b._id).getTime() - new Date(a.createdAt || a._id).getTime());
     },
     enabled: !!userId && isLoggedIn,
-    staleTime: 30 * 1000,
-    gcTime: 5 * 60 * 1000,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
     placeholderData: (prev) => prev,
-    refetchOnWindowFocus: true,
-    refetchOnReconnect: true,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 }
 
@@ -68,6 +68,7 @@ export function useCreateVital(type: string) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['vitals', type] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
   });
 }
@@ -84,6 +85,7 @@ export function useDeleteVital(type: string) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['vitals', type] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
   });
 }
@@ -105,6 +107,7 @@ export function useUpdateVital(type: string) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['vitals', type] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
   });
 }

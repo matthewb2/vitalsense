@@ -8,6 +8,7 @@ import ReactMarkdown from 'react-markdown';
 import { useAuthStore } from '@/store/authStore';
 import Header from '@/app/components/ChatHeader';
 import { useSwipeNavigate } from '@/app/components/useSwipeNavigate';
+import ChatHistorySidebar from '@/components/ChatHistorySidebar';
 import { useChatStore, Message } from '@/store/chatStore';
 
 function ChatContent() {
@@ -112,11 +113,6 @@ function ChatContent() {
     };
   }, []);
 
-  const handleHistoryClick = (content: string) => {
-    setInput(content);
-    setShowHistory(false);
-  };
-
   const handleDeleteHistory = async (e: React.MouseEvent, itemId: string) => {
     e.stopPropagation();
     const currentToken = user?.token?.accessToken || user?.accessToken;
@@ -199,20 +195,24 @@ function ChatContent() {
 
       const currentToken = user?.token?.accessToken || user?.accessToken;
       if (currentToken) {
-        await fetch('/api/posts', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'client-id': 'vitalsense',
-            'Authorization': `Bearer ${currentToken}`
-          },
-          body: JSON.stringify({
-            type: 'chat',
-            title: userMessage.slice(0, 50),
-            content: userMessage,
-            extra: { userId: user?._id, userName: user?.name }
-          }),
-        });
+        // 중복 저장 방지: 이미 history에 있는 메시지는 저장하지 않음
+        const alreadyExists = chatHistory.some(item => item.content === userMessage);
+        if (!alreadyExists) {
+          await fetch('/api/posts', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'client-id': 'vitalsense',
+              'Authorization': `Bearer ${currentToken}`
+            },
+            body: JSON.stringify({
+              type: 'chat',
+              title: userMessage.slice(0, 50),
+              content: userMessage,
+              extra: { userId: user?._id, userName: user?.name }
+            }),
+          });
+        }
         fetchChatHistory();
       }
     } catch (error) {
@@ -225,44 +225,13 @@ function ChatContent() {
 
   return (
     <div ref={containerRef} className="w-full bg-white flex flex-col overflow-hidden fixed inset-0">
-      {/* 히스토리 사이드바 */}
-      {showHistory && (
-        <>
-          <div className="fixed inset-0 bg-black/40 z-40" onClick={() => setShowHistory(false)} />
-          <div className="fixed left-0 top-0 bottom-0 w-80 bg-white z-50 shadow-2xl flex flex-col animate-slide-in">
-            <div className="flex items-center justify-between p-4 border-b border-slate-100">
-              <h2 className="text-base font-bold text-slate-800">이전 질문</h2>
-              <button onClick={() => setShowHistory(false)} className="p-1.5 hover:bg-slate-100 rounded-lg transition text-slate-400 hover:text-slate-600">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-3 space-y-1">
-              {chatHistory.length === 0 ? (
-                <p className="text-slate-400 text-center py-8 text-sm">이전 질문이 없습니다.</p>
-              ) : (
-                chatHistory.map((item, i) => (
-                  <div 
-                    key={item._id || i} 
-                    onClick={() => handleHistoryClick(item.content)}
-                    className="p-3 rounded-xl hover:bg-slate-100 cursor-pointer transition group"
-                  >
-                    <p className="text-sm text-slate-700 line-clamp-2">{item.content}</p>
-                    <div className="flex items-center justify-between mt-1.5">
-                      <p className="text-xs text-slate-400">{item.createdAt?.split('T')[0] || ''}</p>
-                      <button 
-                        onClick={(e) => handleDeleteHistory(e, item._id)}
-                        className="p-1 text-slate-300 hover:text-red-500 transition"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </>
-      )}
+      <ChatHistorySidebar
+        open={showHistory}
+        items={chatHistory}
+        onClose={() => setShowHistory(false)}
+        onItemClick={(content) => { setInput(content); setShowHistory(false); }}
+        onDelete={handleDeleteHistory}
+      />
 
 {/* [본문 레이아웃 고정] 키보드가 켜져도 이 박스의 크기는 절대 변하지 않습니다. */}
       <div className="flex-1 overflow-y-auto min-h-0 bg-white pb-32">

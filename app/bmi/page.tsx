@@ -7,11 +7,10 @@ import { useSwipeNavigate } from '../components/useSwipeNavigate';
 import { Activity, Calculator, Ruler, Scale, ArrowLeft, Edit2, Trash2, X } from 'lucide-react';
 import Link from 'next/link';
 import { useAuthStore } from '@/store/authStore';
+import { useVitalData, useCreateVital, useDeleteVital, useUpdateVital } from '@/hooks/useVitalData';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine
 } from 'recharts';
-
-const API_URL = '/api/posts';
 
 interface HistoryItem {
   _id: number;
@@ -36,10 +35,8 @@ export default function BmiPage() {
     weight: '',
   });
   const [calculatedBmi, setCalculatedBmi] = useState<number | null>(null);
-  const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
   const [visibleCount, setVisibleCount] = useState(5);
-  const [history, setHistory] = useState<HistoryItem[]>([]);
   const [editModal, setEditModal] = useState<{open: boolean; item: HistoryItem | null}>({open: false, item: null});
   const [editForm, setEditForm] = useState({ height: '', weight: '' });
 
@@ -59,58 +56,27 @@ export default function BmiPage() {
     }
   }, [user?._id]);
 
-  useEffect(() => {
-    if (user?._id) {
-      const token = user?.token?.accessToken || user?.accessToken;
-      if (token) {
-        fetchHistory(token);
-      }
-    }
-  }, [user?._id, user?.token]);
+  const { data: rawHistory = [], isFetching } = useVitalData('bmi');
+  const createMutation = useCreateVital('bmi');
+  const deleteMutation = useDeleteVital('bmi');
+  const updateMutation = useUpdateVital('bmi');
 
-  const fetchHistory = async (token: string, silent = false) => {
-    if (!silent) setLoading(true);
-    try {
-      const response = await fetch(`${API_URL}?type=bmi`, {
-        method: 'GET',
-        headers: {
-          'client-id': 'vitalsense',
-          'Authorization': `Bearer ${token}`
-        },
-      });
-      const data = await response.json();
-
-      if (data.ok && data.item) {
-        const userId = user?._id;
-        const parseExtra = (item: any) => { if (typeof item.extra === 'string') { try { return JSON.parse(item.extra); } catch { return {}; } } return item.extra || {}; };
-        const filtered = data.item.filter((item: any) => {
-          const ex = parseExtra(item);
-          return ex.userId === userId || item.user?._id === userId;
-        });
-
-        const parsed = filtered.map((item: any) => {
-          const contentMatch = item.content.match(/체중: ([\d.]+)kg/);
-          const heightMatch = item.content.match(/신장: ([\d.]+)cm/);
-          const weight = contentMatch ? parseFloat(contentMatch[1]) : 0;
-          const height = heightMatch ? parseFloat(heightMatch[1]) : 0;
-          const bmi = height > 0 && weight > 0 ? (weight / ((height / 100) ** 2)).toFixed(1) : '';
-          return {
-            _id: item._id,
-            date: item.content.split('측정 일시: ')[1]?.split('\n')[0] || '',
-            height: heightMatch ? heightMatch[1] : '',
-            weight: contentMatch ? contentMatch[1] : '',
-            bmi: bmi,
-          };
-        });
-
-        setHistory(parsed);
-      }
-    } catch (err) {
-      console.error('Error fetching history:', err);
-    } finally {
-      if (!silent) setLoading(false);
-    }
-  };
+  const history = useMemo(() => {
+    return rawHistory.map((item: any) => {
+      const contentMatch = item.content.match(/체중: ([\d.]+)kg/);
+      const heightMatch = item.content.match(/신장: ([\d.]+)cm/);
+      const weight = contentMatch ? parseFloat(contentMatch[1]) : 0;
+      const height = heightMatch ? parseFloat(heightMatch[1]) : 0;
+      const bmi = height > 0 && weight > 0 ? (weight / ((height / 100) ** 2)).toFixed(1) : '';
+      return {
+        _id: item._id,
+        date: item.content.split('측정 일시: ')[1]?.split('\n')[0] || '',
+        height: heightMatch ? heightMatch[1] : '',
+        weight: contentMatch ? contentMatch[1] : '',
+        bmi: bmi,
+      };
+    });
+  }, [rawHistory]);
 
   const calculateBmi = () => {
     const height = parseFloat(formData.height);
@@ -130,103 +96,46 @@ export default function BmiPage() {
 
   const handleDelete = async (item: HistoryItem) => {
     if (!confirm('이 기록을 삭제하시겠습니까?')) return;
-    const currentToken = user?.token?.accessToken || user?.accessToken;
-    if (!currentToken) return;
-    try {
-      await fetch(`${API_URL}?id=${item._id}`, {
-        method: 'DELETE',
-        headers: {
-          'client-id': 'vitalsense',
-          'Authorization': `Bearer ${currentToken}`
-        },
-      });
-      const token = user?.token?.accessToken || user?.accessToken;
-      if (token) fetchHistory(token, true);
-    } catch (err) {
-      console.error('Error deleting:', err);
+    await deleteMutation.mutateAsync(item._id);
+    if (history.length - 1 <= visibleCount && visibleCount > 5) {
+      setVisibleCount(prev => Math.max(5, prev - 5));
     }
   };
 
   const handleUpdate = async () => {
     if (!editModal.item) return;
-    setLoading(true);
-    const currentToken = user?.token?.accessToken || user?.accessToken;
-    if (!currentToken) { setLoading(false); return; }
-    try {
-      const bmi = calculateBmiFinal(parseFloat(editForm.height), parseFloat(editForm.weight));
-      await fetch(API_URL, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'client-id': 'vitalsense',
-          'Authorization': `Bearer ${currentToken}`
-        },
-        body: JSON.stringify({
-          id: editModal.item._id,
-          type: 'bmi',
-          title: `BMI 기록 - ${bmi} (${editForm.height}cm, ${editForm.weight}kg)`,
-          content: `측정 일시: ${editModal.item.date}\n신장: ${editForm.height}cm\n체중: ${editForm.weight}kg\nBMI: ${bmi}`,
-        }),
-      });
-      setEditModal({ open: false, item: null });
-      const token = user?.token?.accessToken || user?.accessToken;
-      if (token) fetchHistory(token, true);
-    } catch (err) {
-      console.error('Error updating:', err);
-    } finally {
-      setLoading(false);
-    }
+    const bmi = calculateBmiFinal(parseFloat(editForm.height), parseFloat(editForm.weight));
+    await updateMutation.mutateAsync({
+      id: editModal.item._id,
+      title: `BMI 기록 - ${bmi} (${editForm.height}cm, ${editForm.weight}kg)`,
+      content: `측정 일시: ${editModal.item.date}\n신장: ${editForm.height}cm\n체중: ${editForm.weight}kg\nBMI: ${bmi}`,
+    });
+    setEditModal({ open: false, item: null });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.height || !formData.weight) return;
 
-    setLoading(true);
-
-    const currentUser = useAuthStore.getState().user;
-    const currentToken = currentUser?.token?.accessToken || currentUser?.accessToken;
-
-    if (!currentToken) {
-      setLoading(false);
-      return;
+    const userId = user?._id || user?.extra?.userId;
+    const bodyData = { height: formData.height, weight: formData.weight };
+    if (userId) {
+      localStorage.setItem(`bodyData_${userId}`, JSON.stringify(bodyData));
     }
 
-    try {
-      const userId = user?._id || user?.extra?.userId;
-      const bodyData = { height: formData.height, weight: formData.weight };
-      if (userId) {
-        localStorage.setItem(`bodyData_${userId}`, JSON.stringify(bodyData));
-      }
+    const bmi = calculateBmiFinal(parseFloat(formData.height), parseFloat(formData.weight));
+    
+    await createMutation.mutateAsync({
+      title: `BMI 기록 - ${bmi} (${formData.height}cm, ${formData.weight}kg)`,
+      content: `측정 일시: ${new Date().toISOString().split('T')[0]}\n신장: ${formData.height}cm\n체중: ${formData.weight}kg\nBMI: ${bmi}`,
+    });
 
-      const bmi = calculateBmiFinal(parseFloat(formData.height), parseFloat(formData.weight));
-      
-      await fetch(API_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'client-id': 'vitalsense',
-          'Authorization': `Bearer ${currentToken}`
-        },
-        body: JSON.stringify({
-          type: 'bmi',
-          title: `BMI 기록 - ${bmi} (${formData.height}cm, ${formData.weight}kg)`,
-          content: `측정 일시: ${new Date().toISOString().split('T')[0]}\n신장: ${formData.height}cm\n체중: ${formData.weight}kg\nBMI: ${bmi}`,
-          extra: { userId: user?._id, userName: user?.name },
-        }),
-      });
-
-      setSaved(true);
-      fetchHistory(currentToken);
-      
-      setTimeout(() => {
-        setSaved(false);
-      }, 1500);
-    } catch (error) {
-      console.error('Error saving:', error);
-    } finally {
-      setLoading(false);
-    }
+    setSaved(true);
+    setVisibleCount(5);
+    
+    setTimeout(() => {
+      setSaved(false);
+    }, 1500);
   };
 
   const calculateBmiFinal = (height: number, weight: number): string => {
@@ -317,10 +226,10 @@ export default function BmiPage() {
 
             <button
               type="submit"
-              disabled={loading || !formData.height || !formData.weight}
+              disabled={createMutation.isPending || !formData.height || !formData.weight}
               className="w-full py-4 bg-purple-500 text-white font-bold rounded-2xl hover:bg-purple-600 transition disabled:opacity-50 flex items-center justify-center gap-2"
             >
-              {saved ? '저장됨!' : loading ? '저장 중...' : '저장'}
+              {saved ? '저장됨!' : createMutation.isPending ? '저장 중...' : '저장'}
             </button>
           </form>
         </div>
@@ -362,10 +271,10 @@ export default function BmiPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                  {loading ? (
-                    <tr><td colSpan={4} className="p-8 text-center text-slate-400"> loading...</td></tr>
+                  {isFetching && !history.length ? (
+                    <tr><td colSpan={4} className="p-8 text-center text-slate-400"> 로딩 중...</td></tr>
                   ) : (
-                    history.slice(0, visibleCount).map((item) => (
+                    history.slice(0, visibleCount).map((item: HistoryItem) => (
                     <tr key={item._id} className="hover:bg-slate-50/50 transition">
                       <td className="p-4 font-medium">{item.date}</td>
                       <td className="p-4">{item.weight} kg</td>
@@ -420,9 +329,9 @@ export default function BmiPage() {
                       value={editForm.weight} onChange={(e) => setEditForm({...editForm, weight: e.target.value})} />
                   </div>
                 </div>
-                <button type="button" onClick={handleUpdate} disabled={loading}
+                <button type="button" onClick={handleUpdate} disabled={updateMutation.isPending}
                   className="w-full py-3 bg-purple-500 text-white font-bold rounded-xl hover:bg-purple-600 transition disabled:opacity-50">
-                  {loading ? '저장 중...' : '수정하기'}
+                  {updateMutation.isPending ? '저장 중...' : '수정하기'}
                 </button>
               </div>
             </div>

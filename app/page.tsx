@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Activity, Heart, Droplets, Utensils, Search } from 'lucide-react';
+import { Activity, Heart, Droplets, Utensils } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import Header from '@/app/components/Header';
 import RecommendationSection from '@/components/RecommendationSection';
 import ChatWidget from '@/components/ChatWidget';
@@ -14,14 +15,6 @@ export default function HealthDashboard() {
   const router = useRouter();
   const { user, isLoggedIn, checkAuth } = useAuthStore();
   const [mounted, setMounted] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [healthData, setHealthData] = useState({
-    bp: { value: '', status: '' },
-    sugar: { value: '', status: '' },
-    bmi: { value: '', status: '' },
-  });
-  const [todayDiet, setTodayDiet] = useState<any[]>([]);
-  const [todayExercise, setTodayExercise] = useState<any[]>([]);
 
   useEffect(() => {
     setMounted(true);
@@ -34,134 +27,85 @@ export default function HealthDashboard() {
     }
   }, [mounted, isLoggedIn, router]);
 
-  useEffect(() => {
-    const fetchHealthData = async () => {
-      try {
-        const currentToken = user?.token?.accessToken || user?.accessToken;
-        const userId = user?._id || user?.extra?.userId;
-        console.log('[DEBUG] user:', user);
-        console.log('[DEBUG] userId:', userId);
-        if (!currentToken || !userId) return;
+  const currentToken = user?.token?.accessToken || user?.accessToken;
+  const userId = user?._id || user?.extra?.userId;
 
-        const healthDataKey = `healthData_${userId}`;
-        const storedHealthData = localStorage.getItem(healthDataKey);
-        if (storedHealthData) {
-          const parsed = JSON.parse(storedHealthData);
-          console.log('[DEBUG] Loaded from localStorage:', parsed);
-          setHealthData({
-            bp: { value: parsed.bp || '기록없음', status: '' },
-            sugar: { value: parsed.sugar || '기록없음', status: '' },
-            bmi: { value: parsed.bmi || '기록없음', status: '' },
-          });
-        }
+  const fetchDashboard = async () => {
+    if (!currentToken || !userId) throw new Error('No auth');
 
-        console.log('[DEBUG]Fetching health data...');
+    const [bpRes, sugarRes, bmiRes, dietRes, exerciseRes] = await Promise.all([
+      fetch('/api/posts/users?type=bp&limit=100', {
+        headers: { Authorization: `Bearer ${currentToken}` }
+      }),
+      fetch('/api/posts/users?type=blood-sugar&limit=100', {
+        headers: { Authorization: `Bearer ${currentToken}` }
+      }),
+      fetch('/api/posts/users?type=bmi&limit=100', {
+        headers: { Authorization: `Bearer ${currentToken}` }
+      }),
+      fetch('/api/posts/users?type=diet&limit=100', {
+        headers: { Authorization: `Bearer ${currentToken}` }
+      }),
+      fetch('/api/posts/users?type=exercise&limit=100', {
+        headers: { Authorization: `Bearer ${currentToken}` }
+      }),
+    ]);
 
-        const [bpRes, sugarRes, bmiRes, dietRes, exerciseRes] = await Promise.all([
-          fetch('/api/posts/users?type=bp&limit=100', {
-            headers: { 'Authorization': `Bearer ${currentToken}` }
-          }),
-          fetch('/api/posts/users?type=blood-sugar&limit=100', {
-            headers: { 'Authorization': `Bearer ${currentToken}` }
-          }),
-          fetch('/api/posts/users?type=bmi&limit=100', {
-            headers: { 'Authorization': `Bearer ${currentToken}` }
-          }),
-          fetch('/api/posts/users?type=diet&limit=100', {
-            headers: { 'Authorization': `Bearer ${currentToken}` }
-          }),
-          fetch('/api/posts/users?type=exercise&limit=100', {
-            headers: { 'Authorization': `Bearer ${currentToken}` }
-          }),
-        ]);
+    const [bpData, sugarData, bmiData, dietData, exerciseData] = await Promise.all([
+      bpRes.json(), sugarRes.json(), bmiRes.json(), dietRes.json(), exerciseRes.json()
+    ]);
 
-        const bpData = await bpRes.json();
-        const sugarData = await sugarRes.json();
-        const bmiData = await bmiRes.json();
-        const dietData = await dietRes.json();
-        const exerciseData = await exerciseRes.json();
+    const today = new Date().toISOString().split('T')[0];
 
-        const today = new Date().toISOString().split('T')[0];
-        
-        const allDietItems = dietData.item || [];
-        const todayDietItems = allDietItems.filter((item: any) => 
-          item.content && item.content.includes(`측정 일시: ${today}`)
-        );
-        
-        const allExerciseItems = exerciseData.item || [];
-        const todayExerciseItems = allExerciseItems.filter((item: any) => 
-          item.content && item.content.includes(`측정 일시: ${today}`)
-        );
-        
-        console.log('[DEBUG] todayDietItems:', todayDietItems);
-        console.log('[DEBUG] todayExerciseItems:', todayExerciseItems);
-        
-        setTodayDiet(todayDietItems);
-        setTodayExercise(todayExerciseItems);
+    const todayDietItems = (dietData.item || []).filter((item: any) =>
+      item.content && item.content.includes(`측정 일시: ${today}`)
+    );
+    const todayExerciseItems = (exerciseData.item || []).filter((item: any) =>
+      item.content && item.content.includes(`측정 일시: ${today}`)
+    );
 
-        console.log('[DEBUG] BP Response:', bpData);
-        console.log('[DEBUG] Sugar Response:', sugarData);
-        console.log('[DEBUG] BMI Response:', bmiData);
+    const latestBp = (bpData.item || [])[0];
+    const latestSugar = (sugarData.item || [])[0];
+    const latestBmi = (bmiData.item || [])[0];
 
-        const allBpItems = bpData.item || [];
-        const allSugarItems = sugarData.item || [];
-        const allBmiItems = bmiData.item || [];
-
-        console.log('[DEBUG] allBpItems:', allBpItems);
-        console.log('[DEBUG] allSugarItems:', allSugarItems);
-        console.log('[DEBUG] allBmiItems:', allBmiItems);
-        
-        const latestBp = allBpItems[0];
-        const latestSugar = allSugarItems[0];
-        const latestBmi = allBmiItems[0];
-
-        console.log('[DEBUG] latestBp:', latestBp);
-        console.log('[DEBUG] latestSugar:', latestSugar);
-        console.log('[DEBUG] latestBmi:', latestBmi);
-
-        let bpValue = '기록없음';
-        if (latestBp?.title) {
-          bpValue = latestBp.title.replace('혈압 기록 - ', '') || '기록없음';
-        }
-
-        let sugarValue = '기록없음';
-        if (latestSugar?.title) {
-          const match = latestSugar.title.match(/(\d+)\s*mg/);
-          sugarValue = match ? match[1] : '기록없음';
-        }
-
-        let bmiValue = '기록없음';
-        if (latestBmi?.title) {
-          const bmiMatch = latestBmi.title.match(/BMI 기록 - ([\d.]+)/);
-          bmiValue = bmiMatch ? bmiMatch[1] : '기록없음';
-          console.log('[DEBUG] BMI from title:', bmiValue);
-        }
-
-        console.log('[DEBUG] Final values - BP:', bpValue, 'Sugar:', sugarValue, 'BMI:', bmiValue);
-
-        localStorage.setItem(healthDataKey, JSON.stringify({
-          bp: bpValue,
-          sugar: sugarValue,
-          bmi: bmiValue,
-          updatedAt: new Date().toISOString()
-        }));
-
-        setHealthData({
-          bp: { value: bpValue, status: '' },
-          sugar: { value: sugarValue, status: '' },
-          bmi: { value: bmiValue, status: '' },
-        });
-        setLoading(false);
-      } catch (error) {
-        console.error('[DEBUG] Failed to fetch health data:', error);
-        setLoading(false);
-      }
-    };
-
-    if (isLoggedIn && user) {
-      fetchHealthData();
+    let bpValue = '기록없음';
+    if (latestBp?.title) {
+      bpValue = latestBp.title.replace('혈압 기록 - ', '') || '기록없음';
     }
-  }, [isLoggedIn, user]);
+    let sugarValue = '기록없음';
+    if (latestSugar?.title) {
+      const match = latestSugar.title.match(/(\d+)\s*mg/);
+      sugarValue = match ? match[1] : '기록없음';
+    }
+    let bmiValue = '기록없음';
+    if (latestBmi?.title) {
+      const bmiMatch = latestBmi.title.match(/BMI 기록 - ([\d.]+)/);
+      bmiValue = bmiMatch ? bmiMatch[1] : '기록없음';
+    }
+
+    localStorage.setItem(`healthData_${userId}`, JSON.stringify({
+      bp: bpValue, sugar: sugarValue, bmi: bmiValue, updatedAt: new Date().toISOString()
+    }));
+
+    return {
+      bp: { value: bpValue, status: '' },
+      sugar: { value: sugarValue, status: '' },
+      bmi: { value: bmiValue, status: '' },
+      todayDiet: todayDietItems,
+      todayExercise: todayExerciseItems,
+    };
+  };
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['dashboard'],
+    queryFn: fetchDashboard,
+    enabled: !!currentToken && !!userId && isLoggedIn,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
+  });
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 ">
@@ -172,31 +116,31 @@ export default function HealthDashboard() {
         <div className="grid grid-cols-3 gap-2 sm:gap-4">
           <HealthCard 
             title="혈압" 
-            value={healthData.bp.value || '기록없음'} 
+            value={data?.bp.value || '기록없음'} 
             unit="mmHg" 
             icon={<Heart className="text-red-500 w-4 h-4 sm:w-5 sm:h-5" />} 
-            status={healthData.bp.status || ''} 
+            status={data?.bp.status || ''} 
             href="/blood-pressure"
-            loading={loading}
+            loading={isLoading}
           />
           <HealthCard 
             title="혈당" 
-            value={healthData.sugar.value || '기록없음'} 
+            value={data?.sugar.value || '기록없음'} 
             unit="mg/ml" 
             icon={<Droplets className="text-blue-500 w-4 h-4 sm:w-5 sm:h-5" />} 
-            status={healthData.sugar.status || ''} 
+            status={data?.sugar.status || ''} 
             color="text-orange-500"
             href="/blood-sugar"
-            loading={loading}
+            loading={isLoading}
           />
           <HealthCard 
             title="BMI" 
-            value={healthData.bmi.value || '기록없음'} 
+            value={data?.bmi.value || '기록없음'} 
             unit="index" 
             icon={<Activity className="text-purple-500 w-4 h-4 sm:w-5 sm:h-5" />} 
-            status={healthData.bmi.status || ''}
+            status={data?.bmi.status || ''}
             href="/bmi"
-            loading={loading}
+            loading={isLoading}
           />
         </div>
 
@@ -206,7 +150,7 @@ export default function HealthDashboard() {
             <Utensils size={20} /> 오늘 하루 기록
           </h3>
           <div className="space-y-4">
-            {todayDiet.length === 0 ? (
+            {data?.todayDiet?.length === 0 ? (
               <Link href="/diet" className="block">
                 <div className="flex justify-between items-center p-3 bg-slate-50 rounded-lg cursor-pointer hover:bg-slate-100 transition">
                   <span className="text-slate-400">식단: 기록없음</span>
@@ -216,7 +160,7 @@ export default function HealthDashboard() {
             ) : (
               <Link href="/diet" className="block">
                 <div className="space-y-2">
-                  {todayDiet.map((item, i) => {
+                  {data?.todayDiet?.map((item: any, i: number) => {
                     let mealType: 'breakfast' | 'lunch' | 'dinner' | 'other' = item.extra?.mealType || 'other';
                     
                     if ((mealType === 'other') && item.title) {
@@ -236,7 +180,7 @@ export default function HealthDashboard() {
               </Link>
             )}
 
-            {todayExercise.length === 0 ? (
+            {data?.todayExercise?.length === 0 ? (
               <Link href="/exercise" className="block">
                 <div className="flex justify-between items-center p-3 bg-slate-50 rounded-lg cursor-pointer hover:bg-slate-100 transition">
                   <span className="text-slate-400">운동: 기록없음</span>
@@ -246,7 +190,7 @@ export default function HealthDashboard() {
             ) : (
               <Link href="/exercise" className="block">
                 <div className="space-y-2">
-                {todayExercise.map((item, i) => {
+                {data?.todayExercise?.map((item: any, i: number) => {
 let exerciseType = item.extra?.exerciseType;
 let duration = item.extra?.duration;
 let calories = item.extra?.calories ? ` -${item.extra.calories}kcal` : '';
