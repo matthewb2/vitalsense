@@ -262,7 +262,7 @@ return (
           <h3 className="font-semibold mb-4 flex items-center gap-2 text-slate-800">
             <Newspaper size={20} className="text-blue-500" /> RSS 뉴스 피드
           </h3>
-          <div className="space-y-4">
+          <div className="divide-y divide-slate-100">
             {isLoading ? (
               // 스켈레톤 로딩 로직
               [1, 2].map((n) => (
@@ -280,10 +280,18 @@ return (
                   href={item.link}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="block p-4 border border-slate-100 rounded-xl hover:border-blue-200 hover:bg-blue-50/30 transition group"
+                  className="block py-3 hover:bg-blue-50/30 transition group"
                 >
+                  {item.ogImage && (
+                    <img
+                      src={item.ogImage}
+                      alt=""
+                      className="w-full h-40 object-cover rounded-lg mb-2 md:hidden"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                    />
+                  )}
                   <div className="flex justify-between items-start gap-4">
-                    <div className="space-y-1">
+                    <div className="space-y-1 flex-1 min-w-0">
                       <h4 className="font-medium text-slate-900 group-hover:text-blue-600 transition text-base line-clamp-1">
                         {item.title}
                       </h4>
@@ -299,6 +307,14 @@ return (
                         </p>
                       )}
                     </div>
+                    {item.ogImage && (
+                      <img
+                        src={item.ogImage}
+                        alt=""
+                        className="hidden md:block w-28 h-20 object-cover rounded-lg shrink-0"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                      />
+                    )}
                     <ChevronRight size={18} className="text-slate-300 group-hover:text-blue-500 transition shrink-0 mt-1" />
                   </div>
                 </a>
