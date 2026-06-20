@@ -1,12 +1,11 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Activity, Heart, Droplets, Utensils } from 'lucide-react';
+import { Activity, Heart, Droplets, Utensils, Newspaper, ChevronRight } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import Header from '@/app/components/Header';
-import RecommendationSection from '@/components/RecommendationSection';
 import ChatWidget from '@/components/ChatWidget';
 import { useAuthStore } from '@/store/authStore';
 
@@ -15,6 +14,24 @@ export default function HealthDashboard() {
   const router = useRouter();
   const { user, isLoggedIn, checkAuth } = useAuthStore();
   const [mounted, setMounted] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(5);
+  const observerRef = useRef<IntersectionObserver | null>(null);
+  const sentinelRef = useCallback((node: HTMLDivElement | null) => {
+    if (observerRef.current) {
+      observerRef.current.disconnect();
+    }
+    if (node) {
+      observerRef.current = new IntersectionObserver(
+        (entries) => {
+          if (entries[0].isIntersecting) {
+            setVisibleCount((prev) => prev + 5);
+          }
+        },
+        { threshold: 0.1 }
+      );
+      observerRef.current.observe(node);
+    }
+  }, []);
 
   useEffect(() => {
     setMounted(true);
@@ -33,7 +50,8 @@ export default function HealthDashboard() {
   const fetchDashboard = async () => {
     if (!currentToken || !userId) throw new Error('No auth');
 
-    const [bpRes, sugarRes, bmiRes, dietRes, exerciseRes] = await Promise.all([
+    // 기존 데이터 요청과 함께 새로 만든 뉴스 API도 동시에 호출합니다.
+    const [bpRes, sugarRes, bmiRes, dietRes, exerciseRes, newsRes] = await Promise.all([
       fetch('/api/posts/users?type=bp&limit=100', {
         headers: { Authorization: `Bearer ${currentToken}` }
       }),
@@ -49,10 +67,12 @@ export default function HealthDashboard() {
       fetch('/api/posts/users?type=exercise&limit=100', {
         headers: { Authorization: `Bearer ${currentToken}` }
       }),
+      fetch('/api/news').catch(() => null), // 뉴스 에러 방지 처리
     ]);
 
-    const [bpData, sugarData, bmiData, dietData, exerciseData] = await Promise.all([
-      bpRes.json(), sugarRes.json(), bmiRes.json(), dietRes.json(), exerciseRes.json()
+    const [bpData, sugarData, bmiData, dietData, exerciseData, newsData] = await Promise.all([
+      bpRes.json(), sugarRes.json(), bmiRes.json(), dietRes.json(), exerciseRes.json(),
+      newsRes ? newsRes.json() : { items: [] }
     ]);
 
     const today = new Date().toISOString().split('T')[0];
@@ -93,6 +113,7 @@ export default function HealthDashboard() {
       bmi: { value: bmiValue, status: '' },
       todayDiet: todayDietItems,
       todayExercise: todayExerciseItems,
+      news: newsData?.items || [] // 2개의 기사 배열을 데이터에 포함시킵니다.
     };
   };
 
@@ -231,12 +252,70 @@ return (
             )}
           </div>
         </div>
-
-        {/* AI 채팅 위젯 */}
+        
+                {/* AI 채팅 위젯 */}
         <ChatWidget />
 
-        {/* 추천 콘텐츠 */}
-        <RecommendationSection />
+
+        {/* 연합뉴스 RSS 최신 건강 뉴스 섹션 (검색 결과 스타일) */}
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+          <h3 className="font-semibold mb-4 flex items-center gap-2 text-slate-800">
+            <Newspaper size={20} className="text-blue-500" /> RSS 뉴스 피드
+          </h3>
+          <div className="space-y-4">
+            {isLoading ? (
+              // 스켈레톤 로딩 로직
+              [1, 2].map((n) => (
+                <div key={n} className="p-4 border border-slate-100 rounded-xl animate-pulse space-y-2">
+                  <div className="h-5 bg-slate-100 rounded w-2/3"></div>
+                  <div className="h-4 bg-slate-100 rounded w-full"></div>
+                  <div className="h-3 bg-slate-100 rounded w-1/4"></div>
+                </div>
+              ))
+            ) : data?.news && data.news.length > 0 ? (
+              <>
+              {data.news.slice(0, visibleCount).map((item: any, idx: number) => (
+                <a
+                  key={idx}
+                  href={item.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block p-4 border border-slate-100 rounded-xl hover:border-blue-200 hover:bg-blue-50/30 transition group"
+                >
+                  <div className="flex justify-between items-start gap-4">
+                    <div className="space-y-1">
+                      <h4 className="font-medium text-slate-900 group-hover:text-blue-600 transition text-base line-clamp-1">
+                        {item.title}
+                      </h4>
+                      <p className="text-sm text-slate-500 line-clamp-2 leading-relaxed">
+                        {item.description || '관련 뉴스 기사입니다.'}
+                      </p>
+                      <span className="inline-block text-xs text-slate-400 pt-1">
+                        {item.source || 'Google 뉴스'} · {item.pubDate ? new Date(item.pubDate).toLocaleDateString('ko-KR') : ''}
+                      </span>
+                      {item.link && item.link !== '#' && (
+                        <p className="text-xs text-slate-300 truncate max-w-full pt-0.5">
+                          {item.link.replace(/^https?:\/\//, '').slice(0, 40)}{item.link.replace(/^https?:\/\//, '').length > 40 ? '...' : ''}
+                        </p>
+                      )}
+                    </div>
+                    <ChevronRight size={18} className="text-slate-300 group-hover:text-blue-500 transition shrink-0 mt-1" />
+                  </div>
+                </a>
+              ))}
+              {visibleCount < data.news.length && (
+                <div ref={sentinelRef} className="h-8 flex items-center justify-center">
+                  <div className="w-6 h-6 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+                </div>
+              )}
+              </>
+            ) : (
+              <p className="text-sm text-slate-400 text-center py-4">불러올 수 있는 뉴스가 없습니다.</p>
+            )}
+          </div>
+        </div>
+
+
       </main>
     </div>
   );
