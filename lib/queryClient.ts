@@ -20,3 +20,11 @@ export function getQueryClient() {
   }
   return queryClient;
 }
+
+export function getPersister() {
+  if (typeof window === 'undefined') return null;
+  return {
+    storage: window.localStorage,
+    key: 'TANSTACK_QUERY_CACHE',
+  };
+}
