@@ -89,21 +89,37 @@ export default function HealthDashboard() {
 
     const state = useAuthStore.getState();
     const currentUser = state.user;
-    const currentHidden = (currentUser?.extra?.hiddenNewsIds || []).map((v: string) =>
-      v.startsWith('http') ? hashUrl(v) : v
-    );
-    const updatedHidden = [...new Set([...currentHidden, hashed])];
     if (!currentUser?._id) return;
+
     try {
+      const userRes = await fetch(`/api/users?id=${currentUser._id}`);
+      const userData = await userRes.json();
+      let serverExtra: any = userData?.item?.extra || userData?.extra || {};
+      if (typeof serverExtra === 'string') {
+        try { serverExtra = JSON.parse(serverExtra); } catch {}
+      }
+      if (serverExtra && typeof serverExtra === 'object' && !Array.isArray(serverExtra)) {
+        const keys = Object.keys(serverExtra);
+        if (keys.length > 0 && keys.every(k => /^\d+$/.test(k))) {
+          try { serverExtra = JSON.parse(keys.sort((a, b) => Number(a) - Number(b)).map(k => serverExtra[k]).join('')); } catch {}
+        }
+      }
+
+      const currentHidden = (serverExtra.hiddenNewsIds || []).map((v: string) =>
+        v.startsWith('http') ? hashUrl(v) : v
+      );
+      const updatedHidden = [...new Set([...currentHidden, hashed])];
+      const mergedExtra = { ...serverExtra, hiddenNewsIds: updatedHidden };
+
       await fetch('/api/users', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           _id: currentUser._id,
-          extra: { ...currentUser.extra, hiddenNewsIds: updatedHidden },
+          extra: mergedExtra,
         }),
       });
-      state.setUser({ ...currentUser, extra: { ...currentUser.extra, hiddenNewsIds: updatedHidden } });
+      state.setUser({ ...currentUser, extra: mergedExtra });
     } catch (err) {
       console.error('[News] Failed to save hidden state:', err);
     }
@@ -405,10 +421,10 @@ export default function HealthDashboard() {
                                   <MoreVertical size={16} />
                                 </button>
                                 {openMenuIdx === idx && (
-                                  <div className="absolute right-0 top-7 bg-white border border-slate-200 rounded-lg shadow-lg z-10 py-1 min-w-[150px]">
+                                  <div className="absolute right-0 top-7 bg-white border border-slate-200 rounded-lg shadow-lg z-10 py-1 min-w-[200px]">
                                     <button
                                       onClick={(e) => { e.stopPropagation(); e.preventDefault(); window.open(item.link, '_blank'); }}
-                                      className="w-full text-left px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50"
+                                      className="w-full text-left px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
                                     >
                                       새 탭에서 열기
                                     </button>

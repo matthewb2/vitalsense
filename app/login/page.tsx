@@ -54,27 +54,33 @@ function LoginForm() {
 const data = await response.json();
        
        if (response.ok && (data.ok || data._id)) {
-         const userItem = data.item || data;
-         
-         // 이미지 URL 추출: API 응답에 image 있으면 사용, 없으면 googleImage 사용
-         let profileImage = userItem.image || googleImage;
-         
-         // Extract accessToken from various possible locations
-         const accessToken = data.accessToken || data.item?.token?.accessToken || data.item?.accessToken || userItem.token?.accessToken;
-         
-         const userData = {
-           _id: userItem._id,
-           email: userItem.email || googleEmail,
-           name: userItem.name || googleName,
-           type: userItem.type,
-           image: profileImage,
-           loginType: 'google',
-           accessToken: accessToken,
-           token: { 
-             accessToken: accessToken,
-             refreshToken: data.item?.token?.refreshToken || userItem.token?.refreshToken 
-           },
-         };
+          const userItem = data.item || data;
+          
+          // 이미지 URL 추출: API 응답에 image 있으면 사용, 없으면 googleImage 사용
+          let profileImage = userItem.image || googleImage;
+          
+          // Extract accessToken from various possible locations
+          const accessToken = data.accessToken || data.item?.token?.accessToken || data.item?.accessToken || userItem.token?.accessToken;
+          
+          let userExtra = userItem.extra;
+          if (typeof userExtra === 'string') {
+            try { userExtra = JSON.parse(userExtra); } catch { userExtra = undefined; }
+          }
+          
+          const userData = {
+            _id: userItem._id,
+            email: userItem.email || googleEmail,
+            name: userItem.name || googleName,
+            type: userItem.type,
+            image: profileImage,
+            loginType: 'google',
+            accessToken: accessToken,
+            token: { 
+              accessToken: accessToken,
+              refreshToken: data.item?.token?.refreshToken || userItem.token?.refreshToken 
+            },
+            extra: userExtra,
+          };
          setUser(userData);         
          router.push('/');
        } else {
@@ -98,6 +104,9 @@ const data = await response.json();
     if (oauth === 'success' && userParam) {
       try {
         const userData = JSON.parse(userParam);
+        if (userData.extra && typeof userData.extra === 'string') {
+          try { userData.extra = JSON.parse(userData.extra); } catch {}
+        }
         
         // Token exists → existing user → login success
         if (userData.accessToken || userData.token) {

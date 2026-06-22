@@ -16,6 +16,7 @@ interface User {
     birthday?: string;
     userId?: number | string;
     hiddenNewsIds?: string[];
+    providerAccountId?: string;
   };
 }
 
