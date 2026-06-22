@@ -265,7 +265,7 @@ export default function HealthDashboard() {
         </div>
         </Provider>
         {/* 식단 및 운동 요약 */}
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+        <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
           <h3 className="font-semibold mb-4 flex items-center gap-2">
             <Utensils size={20} /> 오늘 하루 기록
           </h3>
@@ -356,7 +356,7 @@ export default function HealthDashboard() {
         <ChatWidget />
 
         {/* RSS 뉴스 피드 섹션 */}
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+        <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
           <h3 className="font-semibold mb-4 flex items-center gap-2 text-slate-800">
             <Newspaper size={20} className="text-blue-500" /> RSS 뉴스 피드
           </h3>
@@ -405,7 +405,7 @@ export default function HealthDashboard() {
                                   <MoreVertical size={16} />
                                 </button>
                                 {openMenuIdx === idx && (
-                                  <div className="absolute right-0 top-7 bg-white border border-slate-200 rounded-lg shadow-lg z-10 py-1 min-w-[100px]">
+                                  <div className="absolute right-0 top-7 bg-white border border-slate-200 rounded-lg shadow-lg z-10 py-1 min-w-[150px]">
                                     <button
                                       onClick={(e) => { e.stopPropagation(); e.preventDefault(); window.open(item.link, '_blank'); }}
                                       className="w-full text-left px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50"
@@ -414,7 +414,7 @@ export default function HealthDashboard() {
                                     </button>
                                     <button
                                       onClick={(e) => { e.stopPropagation(); e.preventDefault(); hideNewsItem(item.link); }}
-                                      className="w-full text-left px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50"
+                                      className="w-full text-left px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
                                     >
                                       숨기기
                                     </button>
@@ -422,12 +422,12 @@ export default function HealthDashboard() {
                                 )}
                               </div>
                             </div>
-                            <p className="text-sm text-slate-500 line-clamp-2 leading-relaxed">
+                            <p className="text-base text-slate-500 line-clamp-2 leading-relaxed">
                               {item.description || '관련 뉴스 기사입니다.'}
                             </p>
                             
                             {/* 크기 대응 날짜 구현 */}
-                            <div className="flex items-center text-xs text-slate-400 pt-1">
+                            <div className="flex items-center text-sm text-slate-400 pt-1">
                               <span>{item.source || 'Google 뉴스'} ·&nbsp;</span>
 {/* 모바일 화면용 (md 미만) */}
 <span className="md:hidden">
@@ -440,7 +440,7 @@ export default function HealthDashboard() {
                             </div>
 
                             {item.link && item.link !== '#' && (
-                              <p className="text-xs text-slate-300 truncate max-w-full pt-0.5">
+                              <p className="text-sm text-slate-300 truncate max-w-full pt-0.5">
                                 {item.link.replace(/^https?:\/\//, '').slice(0, 40)}{item.link.replace(/^https?:\/\//, '').length > 40 ? '...' : ''}
                               </p>
                             )}
