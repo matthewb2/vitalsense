@@ -15,6 +15,7 @@ interface User {
   extra?: {
     birthday?: string;
     userId?: number | string;
+    hiddenNewsIds?: string[];
   };
 }
 

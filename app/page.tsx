@@ -13,12 +13,22 @@ import { useAuthStore } from '@/store/authStore';
 
 export default function HealthDashboard() {
   const router = useRouter();
-  const { user, isLoggedIn, checkAuth } = useAuthStore();
+  const { user, isLoggedIn, checkAuth, setUser } = useAuthStore();
   const [mounted, setMounted] = useState(false);
   const [visibleCount, setVisibleCount] = useState(5);
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
   const [openMenuIdx, setOpenMenuIdx] = useState<number | null>(null);
   const observerRef = useRef<IntersectionObserver | null>(null);
+
+  const hashUrl = (url: string): string => {
+    let hash = 0;
+    for (let i = 0; i < url.length; i++) {
+      const char = url.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash |= 0;
+    }
+    return Math.abs(hash).toString(36);
+  };
 
   // 무한 스크롤 관찰자 설정 (Sentinel 노드)
   const sentinelRef = useCallback((node: HTMLDivElement | null) => {
@@ -44,9 +54,23 @@ export default function HealthDashboard() {
     checkAuth();
     try {
       const stored = JSON.parse(localStorage.getItem('newsHiddenIds') || '[]');
-      setHiddenIds(new Set(stored));
+      if (stored.length > 0) {
+        setHiddenIds(new Set(stored.map((id: string) => hashUrl(id))));
+        localStorage.removeItem('newsHiddenIds');
+      }
     } catch {}
   }, [checkAuth]);
+
+  // user.extra.hiddenNewsIds가 있으면 localStorage보다 우선
+  useEffect(() => {
+    if (user?.extra?.hiddenNewsIds) {
+      setHiddenIds(new Set(
+        user.extra.hiddenNewsIds.map((v: string) =>
+          v.startsWith('http') ? hashUrl(v) : v
+        )
+      ));
+    }
+  }, [user?.extra?.hiddenNewsIds]);
 
   // 미인증 유저 로그인 페이지 리다이렉트
   useEffect(() => {
@@ -56,12 +80,33 @@ export default function HealthDashboard() {
   }, [mounted, isLoggedIn, router]);
 
   // 뉴스 아이템 숨기기 기능
-  const hideNewsItem = (id: string) => {
+  const hideNewsItem = async (id: string) => {
+    const hashed = hashUrl(id);
     const next = new Set(hiddenIds);
-    next.add(id);
+    next.add(hashed);
     setHiddenIds(next);
-    localStorage.setItem('newsHiddenIds', JSON.stringify([...next]));
     setOpenMenuIdx(null);
+
+    const state = useAuthStore.getState();
+    const currentUser = state.user;
+    const currentHidden = (currentUser?.extra?.hiddenNewsIds || []).map((v: string) =>
+      v.startsWith('http') ? hashUrl(v) : v
+    );
+    const updatedHidden = [...new Set([...currentHidden, hashed])];
+    if (!currentUser?._id) return;
+    try {
+      await fetch('/api/users', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          _id: currentUser._id,
+          extra: { ...currentUser.extra, hiddenNewsIds: updatedHidden },
+        }),
+      });
+      state.setUser({ ...currentUser, extra: { ...currentUser.extra, hiddenNewsIds: updatedHidden } });
+    } catch (err) {
+      console.error('[News] Failed to save hidden state:', err);
+    }
   };
 
   // 컨텍스트 메뉴 바깥 클릭 시 닫기
@@ -327,7 +372,7 @@ export default function HealthDashboard() {
             ) : newsData && newsData.length > 0 ? (
               <>
                 {newsData
-                  .filter((item: any) => !hiddenIds.has(item.link))
+                  .filter((item: any) => !hiddenIds.has(hashUrl(item.link)))
                   .slice(0, visibleCount).map((item: any, idx: number) => {
                     const dateFormatted = formatNewsDate(item.pubDate);
                     
