@@ -23,7 +23,7 @@ interface EditModalProps {
     mealType: MealType;
     content: string;
     calories: string;
-    image: string | null;
+    images: string[];
   };
   onFormChange: (field: string, value: any) => void;
   onClose: () => void;
@@ -45,15 +45,22 @@ const mealColors: Record<MealType, string> = {
   other: 'bg-purple-100 text-purple-600',
 };
 
+const IMAGE_HOST_URL = 'http://mksolution.dothome.co.kr/images';
+
 const getImageUrl = (imagePath: string | null | undefined): string | null => {
   if (!imagePath) return null;
   if (imagePath.startsWith('data:')) return imagePath;
   if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) return imagePath;
-  return `http://mksolution.dothome.co.kr/images/${imagePath}`;
+  return `${IMAGE_HOST_URL}/${imagePath}`;
 };
 
 export default function DietEditModal({ open, item, form, onFormChange, onClose, onSave, onImageChange }: EditModalProps) {
   if (!open || !item) return null;
+
+  const removeImage = (idx: number) => {
+    const next = form.images.filter((_, i) => i !== idx);
+    onFormChange('images', next);
+  };
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
@@ -105,17 +112,33 @@ export default function DietEditModal({ open, item, form, onFormChange, onClose,
             />
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-bold text-slate-600 flex items-center gap-1"><Camera size={14} /> 사진 변경</label>
-            <div className="flex items-center gap-4">
-              <label className="flex items-center gap-2 px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-100 transition">
-                <ImagePlus size={20} className="text-slate-500" /><span className="text-sm text-slate-600">사진 선택</span>
-                <input type="file" accept="image/*" className="hidden" onChange={onImageChange} />
+            <label className="text-sm font-bold text-slate-600 flex items-center gap-1"><Camera size={14} /> 사진</label>
+            <div className="flex flex-wrap gap-3">
+              <label className="flex items-center gap-2 px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-100 transition border-dashed">
+                <ImagePlus size={20} className="text-slate-500" /><span className="text-sm text-slate-600">사진 추가</span>
+                <input type="file" accept="image/*" multiple className="hidden" onChange={onImageChange} />
               </label>
-{form.image && (
-                <div className="relative group">
-                  <img src={getImageUrl(form.image) || ""} alt="preview" className="w-16 h-16 object-cover rounded-lg border shadow-sm" />
-                  <button type="button" onClick={() => onFormChange('image', null)} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition"><X size={12} /></button>
+
+              {form.images.map((img, idx) => (
+                <div key={idx} className="relative group">
+                  <img
+                    src={getImageUrl(img) || ''}
+                    alt="food"
+                    className="w-20 h-20 object-cover rounded-xl border-2 border-green-500 shadow-sm"
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeImage(idx)}
+                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-md hover:scale-110 transition"
+                  >
+                    <X size={14} />
+                  </button>
                 </div>
+              ))}
+
+              {form.images.length === 0 && (
+                <p className="text-sm text-slate-400 self-center">등록된 사진이 없습니다</p>
               )}
             </div>
           </div>

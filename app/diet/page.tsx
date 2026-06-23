@@ -141,7 +141,7 @@ export default function DietPage() {
     images: [] as string[],
   });
   const [editModal, setEditModal] = useState<{open: boolean; item: FoodRecord | null}>({open: false, item: null});
-  const [editForm, setEditForm] = useState({ date: '', mealType: 'breakfast' as MealType, content: '', calories: '', image: null as string | null });
+  const [editForm, setEditForm] = useState({ date: '', mealType: 'breakfast' as MealType, content: '', calories: '', images: [] as string[] });
   
   // AI 분석 상태 관리
   const [analyzing, setAnalyzing] = useState(false);
@@ -188,7 +188,7 @@ export default function DietPage() {
             {
               role: "user",
               content: [
-                { type: "text", text: "Analyze this food image and estimate calories. Response MUST be valid JSON: {\"calories\": 350, \"food_name\": \"duck\"}. Use ONLY ASCII characters, no special characters." },
+                { type: "text", text: "음식 사진의 칼로리를 분석하세요 반드시 다음 유효한 JSON 으로 응답하세요 {\"calories\": 350, \"food_name\": \"duck\"}. 특수문자는 사용하지 말고 ASCII 문자만 사용하세요." },
                 {
                   type: "image_url",
                   image_url: { url: `data:image/jpeg;base64,${base64Image}` },
@@ -465,22 +465,23 @@ const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
   const handleEdit = (item: FoodRecord) => {
     const content = item.content.split('\n')[1]?.split(': ')[1] || '';
     const calories = item.calories?.toString() || '';
+    const existingImages = item.image ? item.image.split(',').filter(Boolean) : [];
     setEditForm({
       date: item.date,
       mealType: item.mealType,
       content: content,
       calories: calories,
-      image: item.image || null,
+      images: existingImages,
     });
     setEditModal({ open: true, item });
   };
 
   const handleEditImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
     try {
-      const compressed = await compressImage(file);
-      setEditForm(prev => ({ ...prev, image: compressed }));
+      const compressed = await Promise.all(files.map(f => compressImage(f)));
+      setEditForm(prev => ({ ...prev, images: [...prev.images, ...compressed] }));
     } catch (error) {
       console.error('Image compression error:', error);
     }
@@ -493,34 +494,36 @@ const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!currentToken) return;
 
     try {
-      let imageValue = editForm.image;
-      const isNewImage = editForm.image && editForm.image.startsWith('data:image');
+      const imagePaths: string[] = [];
+      for (const img of editForm.images) {
+        if (img.startsWith('data:')) {
+          const base64Data = img.split(',')[1];
+          const byteCharacters = atob(base64Data);
+          const byteNumbers = new Array(byteCharacters.length);
+          for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+          }
+          const byteArray = new Uint8Array(byteNumbers);
+          const blob = new Blob([byteArray], { type: 'image/jpeg' });
 
-      if (isNewImage) {
-        const base64Data = editForm.image!.split(',')[1];
-        const byteCharacters = atob(base64Data);
-        const byteNumbers = new Array(byteCharacters.length);
-        for (let i = 0; i < byteCharacters.length; i++) {
-          byteNumbers[i] = byteCharacters.charCodeAt(i);
+          const uploadFormData = new FormData();
+          uploadFormData.append('file', blob, 'image.jpg');
+
+          const uploadResponse = await fetch('/api/files', {
+            method: 'POST',
+            headers: {
+              'client-id': 'vitalsense',
+              'Authorization': `Bearer ${currentToken}`
+            },
+            body: uploadFormData,
+          });
+
+          const uploadResult = await uploadResponse.json();
+          const fullPath = uploadResult.path || uploadResult.item?.[0]?.path || uploadResult.url;
+          if (fullPath) imagePaths.push(fullPath.split('/').pop());
+        } else {
+          imagePaths.push(img);
         }
-        const byteArray = new Uint8Array(byteNumbers);
-        const blob = new Blob([byteArray], { type: 'image/jpeg' });
-
-        const uploadFormData = new FormData();
-        uploadFormData.append('file', blob, 'image.jpg');
-
-        const uploadResponse = await fetch('/api/files', {
-          method: 'POST',
-          headers: {
-            'client-id': 'vitalsense',
-            'Authorization': `Bearer ${currentToken}`
-          },
-          body: uploadFormData,
-        });
-
-        const uploadResult = await uploadResponse.json();
-        const fullPath = uploadResult.path || uploadResult.item?.[0]?.path || uploadResult.url;
-        imageValue = fullPath ? fullPath.split('/').pop() : null;
       }
 
       await fetch(API_URL, {
@@ -535,7 +538,7 @@ const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
           type: 'diet',
           title: `${mealLabels[editForm.mealType as MealType]} - ${editForm.content.slice(0, 20)}`,
           content: `측정 일시: ${editForm.date}\n${mealLabels[editForm.mealType as MealType]}: ${editForm.content}${editForm.calories ? `\n(칼로리: ${editForm.calories}kcal)` : ''}`,
-          image: imageValue,
+          image: imagePaths.length > 0 ? imagePaths.join(',') : null,
           extra: { 
             userId: user?._id, 
             userName: user?.name,
