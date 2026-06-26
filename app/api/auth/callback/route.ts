@@ -53,12 +53,14 @@ export async function GET(req: NextRequest) {
     console.log('Login/with response:', loginData);
     console.log('Login status:', loginWithResponse.status);
     
-    let userObj = null;
+      let userObj = null;
     let accessToken = null;
+    let refreshToken = null;
     
     if (loginWithResponse.status === 200 && (loginData.ok || loginData._id)) {
       userObj = loginData.ok ? loginData.item : loginData;
       accessToken = loginData.token?.accessToken || loginData.accessToken;
+      refreshToken = loginData.token?.refreshToken || loginData.refreshToken;
       console.log('Existing user:', userObj);
     }
     else if (loginWithResponse.status === 404) {
@@ -89,6 +91,7 @@ export async function GET(req: NextRequest) {
       if (signupResponse.ok && (signupData.ok || signupData._id)) {
         userObj = signupData.ok ? signupData.item : signupData;
         accessToken = signupData.token?.accessToken || signupData.accessToken;
+        refreshToken = signupData.token?.refreshToken || signupData.refreshToken;
         console.log('New user created:', userObj);
       } else {
         console.log('Signup failed:', signupData.message);
@@ -106,7 +109,7 @@ export async function GET(req: NextRequest) {
         image: profileImage,
         loginType: userObj.loginType || 'google',
         accessToken: accessToken,
-        token: { accessToken: accessToken },
+        token: { accessToken: accessToken, refreshToken },
       };
       
       console.log('Final user data:', userData);

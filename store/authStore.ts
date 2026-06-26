@@ -49,6 +49,19 @@ const isTokenExpired = (token: string): boolean => {
   }
 };
 
+const getTokenExpiry = (token: string): number | null => {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    const base64Url = parts[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const payload = JSON.parse(window.atob(base64));
+    return payload.exp || null;
+  } catch {
+    return null;
+  }
+};
+
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
@@ -57,19 +70,19 @@ export const useAuthStore = create<AuthState>()(
       setUser: (user) => {
         console.debug('[Auth] setUser:', user ? `{_id: ${user._id}, name: ${user.name}, hasAccess: ${!!user.accessToken || !!user.token?.accessToken}, hasRefresh: ${!!user.token?.refreshToken}}` : 'null');
         set({ user, isLoggedIn: !!user });
+        if (user) scheduleRefresh();
       },
       logout: () => {
         console.debug('[Auth] logout');
+        clearRefreshTimer();
         set({ user: null, isLoggedIn: false });
       },
       refreshToken: async () => {
         const { user, logout } = get();
         const refreshToken = user?.token?.refreshToken;
-        const currentAccessToken = user?.accessToken || user?.token?.accessToken;
 
         console.debug('[Auth] refreshToken called', {
           hasRefreshToken: !!refreshToken,
-          hasAccessToken: !!currentAccessToken,
         });
 
         if (!refreshToken) {
@@ -80,30 +93,29 @@ export const useAuthStore = create<AuthState>()(
 
         try {
           const response = await fetch('/api/auth/refresh', {
-            method: 'POST',
+            method: 'GET',
             headers: {
-              'Content-Type': 'application/json',
               'client-id': 'vitalsense',
-              ...(currentAccessToken ? { 'Authorization': `Bearer ${currentAccessToken}` } : {}),
+              'Authorization': `Bearer ${refreshToken}`,
             },
-            body: JSON.stringify({ refreshToken }),
           });
 
           const data = await response.json();
           console.debug('[Auth] Refresh API response:', data);
 
-          if (data.ok && data.item?.token?.accessToken) {
+          if (data.ok && data.accessToken) {
             const updatedUser = {
               ...user,
               token: {
                 ...user?.token,
-                accessToken: data.item.token.accessToken,
-                refreshToken: data.item.token.refreshToken || refreshToken,
+                accessToken: data.accessToken,
+                refreshToken: data.refreshToken || refreshToken,
               },
-              accessToken: data.item.token.accessToken,
+              accessToken: data.accessToken,
             };
             set({ user: updatedUser, isLoggedIn: true });
             console.debug('[Auth] 토큰 갱신 성공');
+            scheduleRefresh();
             return true;
           } else {
             console.debug('[Auth] 토큰 갱신 실패:', data.message);
@@ -135,14 +147,18 @@ export const useAuthStore = create<AuthState>()(
             const refreshed = await refreshToken();
             if (!refreshed) {
               console.debug('[Auth] refresh 실패, 로그아웃');
+            } else {
+              scheduleRefresh();
             }
           } else {
             console.debug('[Auth] accessToken 유효, 로그인 유지');
             set({ isLoggedIn: true });
+            scheduleRefresh();
           }
         } else if (user?.token?.refreshToken) {
           console.debug('[Auth] accessToken 없음, refreshToken으로 갱신 시도...');
-          await refreshToken();
+          const refreshed = await refreshToken();
+          if (refreshed) scheduleRefresh();
         } else {
           console.debug('[Auth] 사용자 정보 없음, 로그아웃 상태');
           set({ isLoggedIn: false });
@@ -154,3 +170,34 @@ export const useAuthStore = create<AuthState>()(
     }
   )
 );
+
+let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+function clearRefreshTimer() {
+  if (refreshTimer !== null) {
+    clearTimeout(refreshTimer);
+    refreshTimer = null;
+  }
+}
+
+function scheduleRefresh() {
+  clearRefreshTimer();
+  const { user } = useAuthStore.getState();
+  const accessToken = user?.accessToken || user?.token?.accessToken;
+  if (!accessToken) return;
+
+  const exp = getTokenExpiry(accessToken);
+  if (!exp) return;
+
+  const now = Math.floor(Date.now() / 1000);
+  const expiresIn = (exp - now) * 1000;
+  const refreshAt = Math.max(expiresIn - 120000, 60000);
+
+  console.debug('[Auth] Scheduling refresh in', Math.round(refreshAt / 1000), 'seconds (token expires in', Math.round(expiresIn / 1000), 'seconds)');
+
+  refreshTimer = setTimeout(async () => {
+    console.debug('[Auth] Scheduled refresh triggered');
+    const { refreshToken } = useAuthStore.getState();
+    await refreshToken();
+  }, refreshAt);
+}

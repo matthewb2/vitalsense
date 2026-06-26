@@ -421,16 +421,16 @@ export default function HealthDashboard() {
                                   <MoreVertical size={16} />
                                 </button>
                                 {openMenuIdx === idx && (
-                                  <div className="absolute right-0 top-7 bg-white border border-slate-200 rounded-lg shadow-lg z-10 py-1 min-w-[200px]">
+                                  <div className="absolute right-0 top-7 bg-white border border-slate-200 rounded-lg shadow-lg z-10 py-1 min-w-[300px]">
                                     <button
                                       onClick={(e) => { e.stopPropagation(); e.preventDefault(); window.open(item.link, '_blank'); }}
-                                      className="w-full text-left px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
+                                      className="w-full text-left px-3 py-1.5 text-base text-slate-700 hover:bg-slate-50"
                                     >
                                       새 탭에서 열기
                                     </button>
                                     <button
                                       onClick={(e) => { e.stopPropagation(); e.preventDefault(); hideNewsItem(item.link); }}
-                                      className="w-full text-left px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
+                                      className="w-full text-left px-3 py-1.5 text-base text-slate-700 hover:bg-slate-50"
                                     >
                                       숨기기
                                     </button>
